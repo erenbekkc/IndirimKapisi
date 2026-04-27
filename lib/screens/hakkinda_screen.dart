@@ -1,0 +1,281 @@
+import 'package:flutter/material.dart';
+
+class HakkindaScreen extends StatelessWidget {
+  const HakkindaScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF0FDF4),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(height: 16),
+
+              // Logo / İkon
+              Container(
+                width: 90,
+                height: 90,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF16A34A).withOpacity(0.18),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/ikon.jpg',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.storefront,
+                      size: 48,
+                      color: Color(0xFF16A34A),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              const Text(
+                'İndirim Kapısı',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF16A34A),
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Yapay Zeka Destekli Alışveriş Asistanı',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
+              _buildCard(
+                icon: Icons.storefront_rounded,
+                iconColor: const Color(0xFF16A34A),
+                title: 'Uygulama Hakkında',
+                content:
+                    'İndirim Kapısı; Migros, ŞOK, BİM ve A101 marketlerinin indirim ve kampanya fırsatlarını tek çatı altında toplayan yenilikçi, yapay zeka destekli bir indirim ve fırsat takip uygulamasıdır.\n\n'
+                    'Hangi üründe ne kadar indirim olduğunu, hangi marketin hangi kampanyayı sunduğunu artık tek tek takip etmenize gerek yok. Tüm fırsatlar sizin için düzenlenmiş hâlde, bir dokunuşta önünüzde.',
+              ),
+
+              const SizedBox(height: 14),
+
+              _buildAiCard(),
+
+              const SizedBox(height: 14),
+
+              _buildCard(
+                icon: Icons.savings_rounded,
+                iconColor: const Color(0xFFD97706),
+                title: 'Fırsat & Tasarruf Hesabı',
+                content:
+                    'Uygulama yalnızca kampanyaları listelemekle kalmaz; ne kadar tasarruf edebileceğinizi de gösterir.\n\n'
+                    'Fiyat indirimleri, 1 alana 1 bedava kampanyaları ve 2. üründe indirim fırsatları için anlık tasarruf hesabı yaparak alışveriş kararlarınızı kolaylaştırır.',
+              ),
+
+              const SizedBox(height: 14),
+
+              _buildCard(
+                icon: Icons.notifications_active_rounded,
+                iconColor: const Color(0xFF2563EB),
+                title: 'Kişiselleştirilmiş Bildirimler',
+                content:
+                    'Takip ettiğiniz market ve kategorilerdeki kampanyalar hakkında düzenli olarak bildirim alırsınız.\n\n'
+                    'Bildirim ayarlarından hangi marketleri ve kategorileri takip etmek istediğinizi belirleyebilirsiniz. Yalnızca sizinle ilgili fırsatlar, doğru zamanda karşınıza çıkar.',
+              ),
+
+              const SizedBox(height: 14),
+
+              _buildCard(
+                icon: Icons.info_outline_rounded,
+                iconColor: const Color(0xFF6B7280),
+                title: 'Önemli Bilgi',
+                content:
+                    'İndirim Kapısı yalnızca bilgi amaçlıdır. Kampanya bilgileri güncel tutulmaya çalışılmakla birlikte, kampanya koşulları ve geçerliliği için ilgili marketi veya market web sitesini takip etmenizi öneririz.\n\n'
+                    'Fiyatlar ve kampanya detayları marketten markete ve zamana göre değişiklik gösterebilir.',
+              ),
+
+              const SizedBox(height: 28),
+
+              // Alt ayak — versiyon
+              Text(
+                'İndirim Kapısı • v1.0',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade400,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '© 2025 İndirim Kapısı. Tüm hakları saklıdır.',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade400,
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAiCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.asset('assets/agent.jpeg', fit: BoxFit.cover),
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Yapay Zeka Desteği',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'YENİ',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF16A34A)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'İndirim Kapısı, yerleşik yapay zeka asistanıyla fırsat takibini bir üst seviyeye taşıyor.\n\n'
+            'Asistana doğal dilde sorular sorabilir, anlık kampanya önerileri alabilirsiniz:',
+            style: TextStyle(fontSize: 13.5, color: Colors.grey.shade700, height: 1.6),
+          ),
+          const SizedBox(height: 10),
+          ...[
+            '💬  "Bu hafta deterjan kampanyası var mı?"',
+            '💬  "500 TL bütçem var, ne alayım?"',
+            '💬  "En iyi fırsatlar hangi marketlerde?"',
+            '💬  "Bugün biten fırsatlar neler?"',
+          ].map((s) => Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(s, style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.5)),
+          )),
+          const SizedBox(height: 8),
+          Text(
+            'Beğendiğin kampanyaları tek tıkla favorilerine ekleyebilir, yapay zeka yardımıyla en avantajlı fırsatları keşfedebilirsin.',
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade500, height: 1.6),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCard({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String content,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: iconColor.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 20, color: iconColor),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            content,
+            style: TextStyle(
+              fontSize: 13.5,
+              color: Colors.grey.shade700,
+              height: 1.6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
