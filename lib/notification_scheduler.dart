@@ -17,7 +17,7 @@ import 'main.dart';
 
 class NotificationScheduler {
   static const _lastSentDateKey = 'last_notif_sent_date'; // "yyyy-MM-dd"
-  static const _notifHour = 14;
+  static const _notifHour = 13;
   static const _notifId   = 777;
 
   static Future<void> scheduleIfNeeded() async {
@@ -164,7 +164,7 @@ class NotificationScheduler {
     final rnd = Random();
     String pick(List<String> list) => list[rnd.nextInt(list.length)];
 
-    final mStr = _joinNames(markets,   max: 3);
+    final mStr = _joinNames(markets,    max: 3);
     final cStr = _joinNames(categories, max: 3);
 
     final hasCats = cStr.isNotEmpty;
@@ -173,11 +173,16 @@ class NotificationScheduler {
         ? [
             '🔥 $mStr\'da $cStr indirimleri devam ediyor — kaçırma!',
             '💰 $mStr\'da $cStr kampanyaları sürüyor, hemen bak! 🛒',
-            '🎉 Bu hafta $mStr\'da $cStr fırsatları var, sepetini doldur!',
+            '🎉 $mStr\'da $cStr fırsatları var, sepetini doldur!',
             '🚀 $mStr\'dan $cStr indirimleri geldi — sen de kazan!',
             '⚡ $mStr\'da $cStr indirimlerini görmedin mi? Hemen incele! 🛍️',
             '🏷️ $cStr fırsatları $mStr\'da seni bekliyor — kaçırma! 🎁',
             '👀 $mStr\'da $cStr kampanyaları bitmeden yetiş!',
+            '🛍️ $mStr\'da $cStr indirimleri şu an aktif — bir göz at!',
+            '✨ $cStr kategorisinde harika fırsatlar var! $mStr\'ı kontrol et 🎯',
+            '💥 $mStr + $cStr = harika tasarruf! Hemen bak 👀',
+            '🤑 $mStr\'da $cStr kampanyaları seni bekliyor, güzel fırsatlar var!',
+            '🌟 $mStr\'daki $cStr indirimlerini keşfettin mi? Kaçırma! 🛒',
           ]
         : [
             '🔥 $mStr\'da indirimler devam ediyor — kaçırma! 🛒',
@@ -186,6 +191,12 @@ class NotificationScheduler {
             '🚀 $mStr\'dan yeni indirimler geldi — sen de kazan!',
             '⚡ $mStr\'da kampanyalar bitmeden yetiş! 🏷️',
             '👀 $mStr\'da takip ettiğin indirimler devam ediyor!',
+            '🛍️ $mStr\'da aktif kampanyalar seni bekliyor — gel bir bak!',
+            '✨ $mStr fırsatlarını kaçırmak istemezsin 😍 Hemen aç!',
+            '🤑 $mStr\'da güzel indirimler var, cebini koru! 💪',
+            '🌟 $mStr\'daki kampanyaları gördün mü? Şimdi tam zamanı! 🎯',
+            '💥 $mStr indirimleri şu an aktif! Alışveriş listeni hazırla 📝',
+            '🎁 $mStr\'dan güzel sürprizler var — bir göz atmaya değer!',
           ];
 
     return pick(templates);

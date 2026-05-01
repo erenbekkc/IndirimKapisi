@@ -1,7 +1,7 @@
 name: indirim_radari
 description: "İndirim Kapısı - Market Kampanyaları"
 publish_to: 'none'
-version: 1.0.0+3
+version: 1.0.0+6
 
 environment:
   sdk: ^3.6.2
@@ -26,6 +26,14 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/logo.jpeg"
+  adaptive_icon_background: "#ffffff"
+  adaptive_icon_foreground: "assets/logo.jpeg"
 
 flutter:
   uses-material-design: true
@@ -33,7 +41,10 @@ flutter:
     - assets/ustbanner.jpeg
     - assets/guncelustbanner.jpeg
     - assets/ikon.jpg
+    - assets/logo.jpeg
     - assets/adi-registration.properties
     - assets/agent.jpeg
+    - assets/agent_gri.jpeg
     - assets/robot.jpeg
     - assets/guncelrobot.jpeg
+    - assets/acilis.jpeg

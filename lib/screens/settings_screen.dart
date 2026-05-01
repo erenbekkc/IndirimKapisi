@@ -24,6 +24,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final Set<String> _subscribedMarkets = {};
   final Set<String> _subscribedCategories = {};
   bool _loading = true;
+  bool _subscribingAll = false;
 
   @override
   void initState() {
@@ -62,6 +63,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _subscribeAll() async {
+    setState(() => _subscribingAll = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final marketsSnap = await FirebaseFirestore.instance.collection('markets').get();
+      final categoriesSnap = await FirebaseFirestore.instance.collection('categories').get();
+
+      for (final doc in marketsSnap.docs) {
+        final topicKey = doc.get('topicKey') as String? ?? doc.id;
+        final safeTopic = 'market_${_normalizeTopicKey(topicKey)}';
+        await FirebaseMessaging.instance.subscribeToTopic(safeTopic);
+        _subscribedMarkets.add(topicKey);
+      }
+      await prefs.setStringList('subscribed_markets', _subscribedMarkets.toList());
+
+      for (final doc in categoriesSnap.docs) {
+        final topicKey = doc.get('topicKey') as String? ?? doc.id;
+        final safeTopic = 'category_${_normalizeTopicKey(topicKey)}';
+        await FirebaseMessaging.instance.subscribeToTopic(safeTopic);
+        _subscribedCategories.add(topicKey);
+      }
+      await prefs.setStringList('subscribed_categories', _subscribedCategories.toList());
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tüm bildirimler açıldı!'),
+            backgroundColor: Color(0xFF16A34A),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _subscribingAll = false);
+    }
+  }
+
   Future<void> _toggleCategory(String topicKey, bool subscribe) async {
     final prefs = await SharedPreferences.getInstance();
     final safeTopic = 'category_${_normalizeTopicKey(topicKey)}';
@@ -91,6 +134,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text('Bildirim Ayarları', style: TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF16A34A),
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          _subscribingAll
+              ? const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: SizedBox(
+                    width: 20, height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  ),
+                )
+              : IconButton(
+                  icon: const Icon(Icons.notifications_active, color: Colors.white),
+                  tooltip: 'Hepsini Aç',
+                  onPressed: _subscribeAll,
+                ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

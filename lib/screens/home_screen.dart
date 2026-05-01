@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'ai_asistan_screen.dart';
 import 'package:intl/intl.dart';
 import '../favorites_manager.dart';
 import '../widgets/image_lightbox.dart';
@@ -14,12 +15,10 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-enum StatusFilter { all, active, upcoming }
-
 class _HomeScreenState extends State<HomeScreen> {
   String? _selectedMarketId;
   String? _selectedCategoryId;
-  StatusFilter _statusFilter = StatusFilter.active;
+  final TextEditingController _searchController = TextEditingController();
   final Map<String, String?> _marketLogos = {};
   final Map<String, String?> _marketLogosByName = {};
   final Map<String, String> _marketCanonicalNames = {};
@@ -32,6 +31,12 @@ class _HomeScreenState extends State<HomeScreen> {
     _setupNotifications();
     _loadMarketLogos();
     _loadCategoryIcons();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _setupNotifications() async {
@@ -87,7 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
           top: false,
           child: Column(
             children: [
-              _buildBanner(context),
+              _buildSearchBar(),
               _buildMarketChips(),
               _buildCategoryChips(),
               Expanded(child: _buildCampaignList()),
@@ -98,47 +103,60 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildBanner(BuildContext context) {
-    return ClipRect(
-      child: Stack(
-      children: [
-        SizedBox(
-          width: double.infinity,
-          height: MediaQuery.of(context).size.width * 0.30,
-          child: Image.asset(
-            'assets/guncelustbanner.jpeg',
-            fit: BoxFit.cover,
+  Widget _buildSearchBar() {
+    return Container(
+      color: const Color(0xFFF0FDF4),
+      padding: const EdgeInsets.fromLTRB(12, 48, 12, 10),
+      child: Row(
+        children: [
+          ClipOval(
+            child: Image.asset(
+              'assets/logo.jpeg',
+              width: 38,
+              height: 38,
+              fit: BoxFit.cover,
+            ),
           ),
-        ),
-        Positioned(
-          right: 12,
-          bottom: 10,
-          child: Row(
-            children: [
-              _buildStatusFilterPill(
-                label: 'Aktif',
-                dotColor: const Color(0xFF4ADE80),
-                selected: _statusFilter == StatusFilter.active,
-                onTap: () => setState(() => _statusFilter =
-                    _statusFilter == StatusFilter.active
-                        ? StatusFilter.all
-                        : StatusFilter.active),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (value) {
+                final query = value.trim();
+                if (query.isEmpty) return;
+                _searchController.clear();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AiAsistanScreen(initialQuery: query),
+                  ),
+                );
+              },
+              decoration: InputDecoration(
+                hintText: 'İndirim ve Fırsat Asistanı',
+                hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                prefixIcon: const Icon(Icons.auto_awesome, color: Color(0xFF16A34A), size: 20),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(28),
+                  borderSide: BorderSide(color: Colors.grey.shade200),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(28),
+                  borderSide: BorderSide(color: Colors.grey.shade200),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(28),
+                  borderSide: const BorderSide(color: Color(0xFF16A34A), width: 1.5),
+                ),
               ),
-              const SizedBox(width: 6),
-              _buildStatusFilterPill(
-                label: 'Yakında',
-                dotColor: const Color(0xFFFBBF24),
-                selected: _statusFilter == StatusFilter.upcoming,
-                onTap: () => setState(() => _statusFilter =
-                    _statusFilter == StatusFilter.upcoming
-                        ? StatusFilter.all
-                        : StatusFilter.upcoming),
-              ),
-            ],
+            ),
           ),
-        ),
-      ],
-    ),
+        ],
+      ),
     );
   }
 
@@ -150,7 +168,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final docs = snapshot.data!.docs;
         return Container(
           color: const Color(0xFFF0FDF4),
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -336,51 +354,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildStatusFilterPill({
-    required String label,
-    required Color dotColor,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: selected ? Colors.white : Colors.white.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? Colors.white : Colors.white.withOpacity(0.4),
-            width: 1,
-          ),
-          boxShadow: selected
-              ? [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 4, offset: const Offset(0, 2))]
-              : [],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: selected ? const Color(0xFF16A34A) : Colors.white,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _chip({
     required String label,
     required bool selected,
@@ -423,24 +396,20 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
 
         final now = DateTime.now();
-        var docs = snapshot.data!.docs;
+        final today = DateTime(now.year, now.month, now.day);
 
-        // Client-side filtreleme
-        docs = docs.where((doc) {
+        var docs = snapshot.data!.docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
-          if (_selectedMarketId != null && data['marketId'] != _selectedMarketId) return false;
-          if (_selectedCategoryId != null && data['categoryId'] != _selectedCategoryId) return false;
-          final startDate = (data['startDate'] as Timestamp?)?.toDate();
+          // Süresi dolmuşları gizle
           final endDate = (data['endDate'] as Timestamp?)?.toDate();
-          final today = DateTime(now.year, now.month, now.day);
-          if (_statusFilter == StatusFilter.active) {
-            if (endDate != null && endDate.isBefore(today)) return false;
-            if (startDate != null && startDate.isAfter(now)) return false;
-          } else if (_statusFilter == StatusFilter.upcoming) {
-            if (startDate == null || !startDate.isAfter(now)) return false;
-          } else {
-            if (endDate != null && endDate.isBefore(today)) return false;
+          if (endDate != null) {
+            final endDay = DateTime(endDate.year, endDate.month, endDate.day);
+            if (endDay.isBefore(today)) return false;
           }
+          // Market filtresi
+          if (_selectedMarketId != null && data['marketId'] != _selectedMarketId) return false;
+          // Kategori filtresi
+          if (_selectedCategoryId != null && data['categoryId'] != _selectedCategoryId) return false;
           return true;
         }).toList();
 
@@ -453,14 +422,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 12),
                 const Text('Kampanya bulunamadı',
                     style: TextStyle(color: Colors.grey, fontSize: 16)),
-                if (_selectedMarketId != null || _selectedCategoryId != null || _statusFilter != StatusFilter.all) ...[
+                if (_selectedMarketId != null || _selectedCategoryId != null) ...[
                   const SizedBox(height: 8),
                   TextButton(
-                    onPressed: () => setState(() {
-                      _selectedMarketId = null;
-                      _selectedCategoryId = null;
-                      _statusFilter = StatusFilter.all;
-                    }),
+                    onPressed: () {
+                      setState(() {
+                        _selectedMarketId = null;
+                        _selectedCategoryId = null;
+                      });
+                    },
                     child: const Text('Filtreyi Temizle'),
                   ),
                 ],
@@ -481,15 +451,12 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(
               child: ListView.separated(
                 padding: const EdgeInsets.all(12),
-                // Her 5 kampanyada 1 reklam eklenir
                 itemCount: docs.length + (docs.length ~/ 5),
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (context, i) {
-                  // Her 6. eleman (index 5, 11, 17...) native reklam
                   if ((i + 1) % 6 == 0) {
                     return const NativeAdWidget();
                   }
-                  // Reklam slotlarını sayarak gerçek kampanya indexini bul
                   final adCount = i ~/ 6;
                   final campaignIndex = i - adCount;
                   return _buildCampaignCard(docs[campaignIndex]);
@@ -600,17 +567,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               }),
             ],
-            if (data['campaignType'] == 'buyOneGetOne' &&
-                (data['productPrice'] as num?) != null &&
-                (data['productPrice'] as num) > 0) ...[
+            if (data['campaignType'] == 'buyOneGetOne') ...[
               const SizedBox(height: 6),
               Builder(builder: (_) {
-                final price = (data['productPrice'] as num).toDouble();
+                final price = (data['productPrice'] as num?)?.toDouble() ?? 0;
                 final fullTotal = price * 2;
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Pill: 🔥 1 alana 1 bedava
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
@@ -626,6 +590,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
+                    if (price > 0) ...[
                     const SizedBox(height: 6),
                     Row(
                       children: [
@@ -650,6 +615,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ],
                     ),
+                    ],
                   ],
                 );
               }),
@@ -666,7 +632,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Pill: 🔥 1 alana 2. %X indirimli
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
@@ -784,7 +749,6 @@ class _HomeScreenState extends State<HomeScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // Badge + Kalp yan yana
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [

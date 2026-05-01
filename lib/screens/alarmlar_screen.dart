@@ -93,7 +93,7 @@ class _AlarmlarScreenState extends State<AlarmlarScreen> {
           }
           final now = DateTime.now();
           final today = DateTime(now.year, now.month, now.day);
-          final fmt = NumberFormat('#,##0.00', 'tr_TR');
+          final fmt = NumberFormat('#,##0', 'tr_TR');
           final dateFormat = DateFormat('dd MMM', 'tr_TR');
 
           // Sadece bugün ve yarın biten aktif kampanyalar
@@ -282,8 +282,7 @@ class _AlarmlarScreenState extends State<AlarmlarScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(data['product'] ?? data['title'] ?? '',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                      overflow: TextOverflow.ellipsis),
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   _buildPriceSection(data, fmt),
                   const SizedBox(height: 4),
@@ -292,7 +291,7 @@ class _AlarmlarScreenState extends State<AlarmlarScreen> {
                       Icon(Icons.calendar_today, size: 11, color: Colors.grey.shade400),
                       const SizedBox(width: 4),
                       Text('Bitiş: ${dateFormat.format(endDate)}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                          style: const TextStyle(fontSize: 12, color: Colors.black87)),
                     ],
                   ),
                 ],
@@ -559,7 +558,7 @@ class _AlarmlarScreenState extends State<AlarmlarScreen> {
           Icon(fallback, size: 12, color: Colors.grey.shade400),
         const SizedBox(width: 3),
         Text(label,
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+            style: const TextStyle(fontSize: 11, color: Colors.black87),
             overflow: TextOverflow.ellipsis),
       ],
     );

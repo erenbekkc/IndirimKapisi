@@ -4,12 +4,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import '../favorites_manager.dart';
+import '../widgets/image_lightbox.dart';
 
 // Mesajlar uygulama açık olduğu sürece korunur
 final List<_ChatMessage> _persistedMessages = [];
 
 class AiAsistanScreen extends StatefulWidget {
-  const AiAsistanScreen({super.key});
+  final String? initialQuery;
+  const AiAsistanScreen({super.key, this.initialQuery});
 
   @override
   State<AiAsistanScreen> createState() => _AiAsistanScreenState();
@@ -44,7 +46,12 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         isUser: false,
       ));
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToBottom();
+      if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
+        _send(widget.initialQuery!);
+      }
+    });
   }
 
   @override
@@ -125,17 +132,20 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
   static const _synonymGroups = [
     ['tavuk', 'piliç', 'kanat', 'bonfile', 'but', 'göğüs', 'baget', 'hindi'],
     ['deterjan', 'çamaşır', 'temizlik', 'sabun', 'yumuşatıcı', 'çamaşır suyu', 'toz'],
-    ['meyve', 'sebze', 'domates', 'salatalık', 'elma', 'portakal', 'muz', 'salata'],
+    ['meyve', 'sebze', 'elma', 'portakal', 'muz', 'salata'],
     ['süt', 'yoğurt', 'peynir', 'tereyağı', 'kaymak', 'ayran', 'kefir', 'süt ürün'],
-    ['ekmek', 'pasta', 'kek', 'bisküvi', 'kraker', 'börek', 'poğaça', 'simit'],
+    ['ekmek', 'pasta', 'kek', 'bisküvi', 'kraker', 'börek', 'poğaça', 'simit', 'tost'],
     ['şampuan', 'saç', 'krem', 'losyon', 'deodorant', 'parfüm', 'kozmetik'],
-    ['kahve', 'çay', 'nescafe', 'türk kahvesi', 'çay', 'bitki çayı'],
+    ['kahve', 'çay', 'nescafe', 'türk kahvesi', 'bitki çayı'],
     ['makarna', 'pirinç', 'bulgur', 'un', 'şeker', 'tuz', 'yağ', 'zeytinyağı'],
     ['bebek', 'bez', 'mama', 'ıslak mendil', 'biberon'],
     ['et', 'kıyma', 'köfte', 'sucuk', 'sosis', 'salam', 'jambon'],
     ['balık', 'deniz ürün', 'ton balığı', 'somon', 'sardalye'],
     ['su', 'maden suyu', 'içecek', 'meşrubat', 'kola', 'ayran', 'meyve suyu'],
     ['atıştırmalık', 'çikolata', 'gofret', 'cips', 'fındık', 'fıstık', 'kuruyemiş'],
+    ['kahvaltı', 'kahvaltılık', 'peynir', 'zeytin', 'yumurta', 'domates', 'salatalık',
+     'reçel', 'bal', 'marmelat', 'nutella', 'çikolatalı krema', 'tereyağı', 'kaymak',
+     'ekmek', 'tost', 'pide', 'açma', 'poğaça', 'simit', 'tahini', 'pekmez'],
   ];
 
   List<Map<String, dynamic>> _matchCampaignsLocally(String userQuery) {
@@ -201,10 +211,12 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
 Türkiye\'deki market kampanyaları hakkında yardım ediyorsun.
 Kısa, net ve samimi cevaplar ver. Türkçe eş anlamlı kelimeleri anla (tavuk=piliç=kanat=but=göğüs=baget, deterjan=çamaşır=temizlik, vb.).
 TL cinsinden tasarruf hesapları yap, bütçeye göre öneriler sun.
+Kahvaltı veya kahvaltılık denildiğinde şu ürünleri ara: peynir, zeytin, zeytinyağı, yumurta, domates, salatalık, reçel, bal, marmelat, nutella, çikolatalı krema, tereyağı, kaymak, ekmek, tost ekmeği, pide, açma, poğaça, simit, tahini, pekmez. Bu ürünlerin geçtiği TÜM kampanyaları ID listesine ekle.
 
-ÖNEMLİ: Cevabının EN SONUNA, ilgili kampanyaların ID\'lerini şu formatta ekle (max 5):
+ÖNEMLİ: Cevabının EN SONUNA, ilgili kampanyaların ID\'lerini şu formatta ekle (geniş kategori sorgularında max 15, dar sorgularda max 5):
 KAMPANYALAR:["id1","id2","id3"]
 İlgili kampanya yoksa: KAMPANYALAR:[]
+Kahvaltı/kahvaltılık sorgularında listede peynir, zeytin, zeytinyağı, yumurta, domates, salatalık, reçel, bal, marmelat, nutella, çikolatalı krema, tereyağı, kaymak, ekmek, tost, pide, poğaça, simit, tahini, pekmez geçen TÜM kampanyaları ID\'ye ekle.
 
 Kampanya verisi (ID|Ürün|Market|Kategori|Fiyat|Bitiş):
 $context''',
@@ -279,10 +291,11 @@ $context''',
         title: const Row(children: [
           CircleAvatar(
             radius: 14,
-            backgroundImage: AssetImage('assets/agent.jpeg'),
+            backgroundImage: AssetImage('assets/agent_gri.jpeg'),
+            backgroundColor: Colors.transparent,
           ),
           SizedBox(width: 8),
-          Text('Alışveriş Asistanı',
+          Text('İndirim ve Fırsat Asistanı',
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
         ]),
         backgroundColor: const Color(0xFF16A34A),
@@ -403,12 +416,10 @@ $context''',
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               if (!msg.isUser) ...[
-                Container(
-                  width: 32, height: 32,
-                  margin: const EdgeInsets.only(right: 8),
-                  decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                  child: ClipOval(child: Image.asset('assets/agent.jpeg', fit: BoxFit.cover)),
+                ClipOval(
+                  child: Image.asset('assets/agent_gri.jpeg', width: 32, height: 32, fit: BoxFit.cover),
                 ),
+                const SizedBox(width: 8),
               ],
               Flexible(
                 child: Container(
@@ -477,17 +488,47 @@ $context''',
     final imageUrl = c['productImageUrl'] as String?;
     final endDate = (c['endDate'] as Timestamp?)?.toDate();
 
-    String priceInfo = '';
+    Widget? priceWidget;
     if (type == 'priceDiscount') {
       final oldP = (c['oldPrice'] as num?)?.toDouble() ?? 0;
       final newP = (c['newPrice'] as num?)?.toDouble() ?? 0;
       final pct = oldP > 0 ? ((oldP - newP) / oldP * 100).round() : 0;
-      priceInfo = '%$pct indirim • ${_priceFmt.format(newP)} TL';
+      priceWidget = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Text('${_priceFmt.format(oldP)} TL',
+                style: const TextStyle(
+                    fontSize: 12, color: Colors.grey,
+                    decoration: TextDecoration.lineThrough)),
+            const SizedBox(width: 6),
+            Text('${_priceFmt.format(newP)} TL',
+                style: const TextStyle(
+                    fontSize: 13, color: Colors.deepOrange,
+                    fontWeight: FontWeight.bold)),
+          ]),
+          if (pct > 0) ...[
+            const SizedBox(height: 2),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                  color: const Color(0xFFFFF7ED),
+                  borderRadius: BorderRadius.circular(20)),
+              child: Text('🔥 %$pct indirim',
+                  style: const TextStyle(
+                      fontSize: 11, color: Colors.deepOrange,
+                      fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ],
+      );
     } else if (type == 'buyOneGetOne') {
-      priceInfo = '1 alana 1 bedava';
+      priceWidget = const Text('🔥 1 alana 1 bedava',
+          style: TextStyle(fontSize: 12, color: Colors.deepOrange, fontWeight: FontWeight.w600));
     } else if (type == 'secondDiscount') {
       final rate = (c['discountRate'] as num?)?.toInt() ?? 0;
-      priceInfo = '2. üründe %$rate indirim';
+      priceWidget = Text('🔥 2. üründe %$rate indirim',
+          style: const TextStyle(fontSize: 12, color: Colors.deepOrange, fontWeight: FontWeight.w600));
     }
 
     return ValueListenableBuilder<Set<String>>(
@@ -508,10 +549,16 @@ $context''',
           child: Row(
             children: [
               if (imageUrl != null && imageUrl.isNotEmpty)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(imageUrl, width: 48, height: 48, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox(width: 48)),
+                GestureDetector(
+                  onTap: () => showImageLightbox(context, imageUrl, 'ai_campaign_$id'),
+                  child: Hero(
+                    tag: 'ai_campaign_$id',
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(imageUrl, width: 48, height: 48, fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const SizedBox(width: 48)),
+                    ),
+                  ),
                 )
               else
                 Container(
@@ -525,8 +572,7 @@ $context''',
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(product,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 2),
                     Row(
                       children: [
@@ -535,15 +581,13 @@ $context''',
                         else
                           Icon(Icons.store, size: 13, color: Colors.grey.shade400),
                         const SizedBox(width: 4),
-                        Text(market, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                        Text(market, style: const TextStyle(fontSize: 11, color: Colors.black87)),
                       ],
                     ),
-                    if (priceInfo.isNotEmpty)
-                      Text(priceInfo,
-                          style: const TextStyle(fontSize: 12, color: Colors.deepOrange, fontWeight: FontWeight.w600)),
+                    if (priceWidget != null) priceWidget,
                     if (endDate != null)
                       Text('Bitiş: ${_dateFmt.format(endDate)}',
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+                          style: const TextStyle(fontSize: 11, color: Colors.black87)),
                   ],
                 ),
               ),
@@ -571,12 +615,10 @@ $context''',
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          Container(
-            width: 32, height: 32,
-            margin: const EdgeInsets.only(right: 8),
-            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-            child: ClipOval(child: Image.asset('assets/agent.jpeg', fit: BoxFit.cover)),
+          ClipOval(
+            child: Image.asset('assets/agent_gri.jpeg', width: 32, height: 32, fit: BoxFit.cover),
           ),
+          const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(

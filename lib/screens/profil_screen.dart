@@ -24,6 +24,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
   final Set<String> _subscribedMarkets = {};
   final Set<String> _subscribedCategories = {};
   bool _loading = true;
+  bool _subscribingAll = false;
 
   @override
   void initState() {
@@ -38,6 +39,39 @@ class _ProfilScreenState extends State<ProfilScreen> {
       _subscribedCategories.addAll(prefs.getStringList('subscribed_categories') ?? []);
       _loading = false;
     });
+  }
+
+  Future<void> _subscribeAll() async {
+    setState(() => _subscribingAll = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final marketsSnap = await FirebaseFirestore.instance.collection('markets').get();
+      final categoriesSnap = await FirebaseFirestore.instance.collection('categories').get();
+      for (final doc in marketsSnap.docs) {
+        final topicKey = doc.get('topicKey') as String? ?? doc.id;
+        await FirebaseMessaging.instance.subscribeToTopic('market_${_normalizeTopicKey(topicKey)}');
+        _subscribedMarkets.add(topicKey);
+      }
+      await prefs.setStringList('subscribed_markets', _subscribedMarkets.toList());
+      for (final doc in categoriesSnap.docs) {
+        final topicKey = doc.get('topicKey') as String? ?? doc.id;
+        await FirebaseMessaging.instance.subscribeToTopic('category_${_normalizeTopicKey(topicKey)}');
+        _subscribedCategories.add(topicKey);
+      }
+      await prefs.setStringList('subscribed_categories', _subscribedCategories.toList());
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tüm bildirimler açıldı!'), backgroundColor: Color(0xFF16A34A)),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _subscribingAll = false);
+    }
   }
 
   Future<void> _toggleMarket(String topicKey, bool subscribe) async {
@@ -100,11 +134,29 @@ class _ProfilScreenState extends State<ProfilScreen> {
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Text(
-                    'Marketler',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Row(
+                    children: [
+                      const Text(
+                        'Marketler',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey),
+                      ),
+                      const Spacer(),
+                      _subscribingAll
+                          ? const SizedBox(width: 20, height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF16A34A)))
+                          : TextButton(
+                              onPressed: _subscribeAll,
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                backgroundColor: const Color(0xFFDCFCE7),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: const Text('Tüm Bildirimleri Aç',
+                                  style: TextStyle(fontSize: 12, color: Color(0xFF16A34A), fontWeight: FontWeight.w600)),
+                            ),
+                    ],
                   ),
                 ),
                 _buildMarketList(),

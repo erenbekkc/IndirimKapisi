@@ -475,8 +475,6 @@ class _FavorilerScreenState extends State<FavorilerScreen> {
                   Text(
                     data['product'] ?? data['title'] ?? '',
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
                   ),
                   const SizedBox(height: 4),
                   _buildPriceSection(data, fmt),
@@ -539,7 +537,7 @@ class _FavorilerScreenState extends State<FavorilerScreen> {
           Icon(fallback, size: 12, color: Colors.grey.shade400),
         const SizedBox(width: 3),
         Text(label,
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+            style: const TextStyle(fontSize: 11, color: Colors.black87),
             overflow: TextOverflow.ellipsis),
       ],
     );

@@ -32,7 +32,7 @@ class HakkindaScreen extends StatelessWidget {
                 ),
                 child: ClipOval(
                   child: Image.asset(
-                    'assets/ikon.jpg',
+                    'assets/logo.jpeg',
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => const Icon(
                       Icons.storefront,
@@ -54,12 +54,16 @@ class HakkindaScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Yapay Zeka Destekli Alışveriş Asistanı',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w500,
+              const SizedBox(
+                width: double.infinity,
+                child: Text(
+                  'İndirim ve Fırsat Takip Asistanınız',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
 
@@ -111,6 +115,49 @@ class HakkindaScreen extends StatelessWidget {
                     'Fiyatlar ve kampanya detayları marketten markete ve zamana göre değişiklik gösterebilir.',
               ),
 
+              const SizedBox(height: 14),
+
+              // Yasal Uyarı
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFCD34D)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.gavel_rounded, size: 18, color: Color(0xFFD97706)),
+                        SizedBox(width: 8),
+                        Text(
+                          'YASAL UYARI',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFFD97706),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'İndirim Kapısı uygulaması, bağımsız olarak geliştirilmiş bir kampanya takip platformudur. Uygulama; BİM, A101, Şok, Migros ve diğer market zincirleriyle herhangi bir resmi ortaklık, sponsorluk veya bağlantı içermemektedir.\n\n'
+                      'Uygulamada kullanılan marka isimleri, logolar ve ticari markalar yalnızca tanımlama amacıyla kullanılmış olup ilgili şirketlerin tescilli mülkiyetindedir.\n\n'
+                      'Kampanya ve indirim bilgileri kamuya açık kaynaklardan derlenmekte olup doğruluk garantisi verilmemektedir. Güncel fiyat ve kampanya bilgileri için ilgili marketin resmi kanallarını ziyaret ediniz.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF92400E),
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
               const SizedBox(height: 28),
 
               // Alt ayak — versiyon
@@ -157,17 +204,9 @@ class HakkindaScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.asset('assets/agent.jpeg', fit: BoxFit.cover),
-                ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.asset('assets/agent_gri.jpeg', width: 36, height: 36, fit: BoxFit.cover),
               ),
               const SizedBox(width: 10),
               const Expanded(

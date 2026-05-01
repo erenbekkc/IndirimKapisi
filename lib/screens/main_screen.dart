@@ -36,13 +36,13 @@ class _MainScreenState extends State<MainScreen> {
             MaterialPageRoute(builder: (_) => const AiAsistanScreen()),
           );
         },
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 4,
         child: ClipOval(
           child: Image.asset(
-            'assets/agent.jpeg',
-            width: 52,
-            height: 52,
+            'assets/agent_gri.jpeg',
+            width: 56,
+            height: 56,
             fit: BoxFit.cover,
           ),
         ),
