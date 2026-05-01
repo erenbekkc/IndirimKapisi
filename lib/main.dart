@@ -275,7 +275,7 @@ class IndirimRadariApp extends StatelessWidget {
           scrolledUnderElevation: 0,
           centerTitle: false,
         ),
-        cardTheme: const CardTheme(
+        cardTheme: const CardThemeData(
           color: Colors.white,
           surfaceTintColor: Colors.transparent,
           elevation: 1.5,
