@@ -8,6 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'firebase_options.dart';
 import 'favorites_manager.dart';
 import 'screens/main_screen.dart';
@@ -169,6 +170,7 @@ Future<void> _initLocalNotifications() async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
   await MobileAds.instance.initialize();
   await initializeDateFormatting('tr_TR', null);
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
