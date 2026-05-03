@@ -47,6 +47,11 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-2034415381778097~8817994172</string>
 	<key>NSUserTrackingUsageDescription</key>
