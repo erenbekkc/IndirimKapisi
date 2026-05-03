@@ -152,8 +152,13 @@ String _generalMessage(int total) {
 
 Future<void> _initLocalNotifications() async {
   const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const iosSettings = DarwinInitializationSettings(
+    requestAlertPermission: false,
+    requestBadgePermission: false,
+    requestSoundPermission: false,
+  );
   await localNotifications.initialize(
-    const InitializationSettings(android: androidSettings),
+    const InitializationSettings(android: androidSettings, iOS: iosSettings),
   );
 
   const androidChannel = AndroidNotificationChannel(

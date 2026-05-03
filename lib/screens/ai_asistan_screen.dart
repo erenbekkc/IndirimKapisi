@@ -24,7 +24,14 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
 
   List<Map<String, dynamic>> _activeCampaigns = [];
 
-  static const _apiKey = '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';
+  String? _apiKey;
+
+  Future<void> _loadApiKey() async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('config').doc('ai').get();
+      _apiKey = doc.data()?['apiKey'] as String?;
+    } catch (_) {}
+  }
 
   final _priceFmt = NumberFormat('#,##0.00', 'tr_TR');
   final _dateFmt = DateFormat('dd MMM', 'tr_TR');
@@ -46,6 +53,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         isUser: false,
       ));
     }
+    _loadApiKey();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
       if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
@@ -195,12 +203,25 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
     _scrollToBottom();
 
     try {
+      if (_apiKey == null) {
+        await _loadApiKey();
+      }
+      if (_apiKey == null) {
+        setState(() => _persistedMessages.add(_ChatMessage(
+          text: 'Asistan şu an kullanılamıyor, lütfen daha sonra tekrar deneyin.',
+          isUser: false,
+          isError: true,
+        )));
+        setState(() => _loading = false);
+        return;
+      }
+
       final context = await _fetchCampaignContext();
 
       final resp = await http.post(
         Uri.parse('https://api.anthropic.com/v1/messages'),
         headers: {
-          'x-api-key': _apiKey,
+          'x-api-key': _apiKey!,
           'anthropic-version': '2023-06-01',
           'content-type': 'application/json',
         },
@@ -256,6 +277,20 @@ $context''',
           matchedCampaigns: matched,
         )));
       } else {
+        String errorDetail = '';
+        try {
+          final errBody = jsonDecode(utf8.decode(resp.bodyBytes));
+          errorDetail = errBody['error']?['message'] ?? resp.body;
+        } catch (_) {
+          errorDetail = resp.body;
+        }
+        FirebaseFirestore.instance.collection('chatbot_logs').add({
+          'type': 'api_error',
+          'statusCode': resp.statusCode,
+          'errorMessage': errorDetail,
+          'userQuery': q,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
         setState(() => _persistedMessages.add(_ChatMessage(
           text: 'Bir hata oluştu, tekrar deneyin.',
           isUser: false,
@@ -263,8 +298,14 @@ $context''',
         )));
       }
     } catch (e) {
+      FirebaseFirestore.instance.collection('chatbot_logs').add({
+        'type': 'connection_error',
+        'errorMessage': e.toString(),
+        'userQuery': q,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
       setState(() => _persistedMessages.add(_ChatMessage(
-        text: 'Bağlantı hatası: $e',
+        text: 'Bağlantı hatası oluştu, tekrar deneyin.',
         isUser: false,
         isError: true,
       )));
