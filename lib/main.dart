@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -172,16 +173,26 @@ Future<void> _initLocalNotifications() async {
       ?.createNotificationChannel(androidChannel);
 }
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
-  await MobileAds.instance.initialize();
-  await initializeDateFormatting('tr_TR', null);
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  await _initLocalNotifications();
-  await FavoritesManager.load();
-  FirebaseMessaging.instance.subscribeToTopic('indirim_radari_all').catchError((_) {});
+void main() {
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    FlutterError.onError = (details) {
+      FirebaseFirestore.instance.collection('crash_logs').add({
+        'type': 'flutter_error',
+        'error': details.exceptionAsString(),
+        'stack': details.stack.toString(),
+        'platform': 'ios',
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    };
+    FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
+    await MobileAds.instance.initialize();
+    await initializeDateFormatting('tr_TR', null);
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    await _initLocalNotifications();
+    await FavoritesManager.load();
+    FirebaseMessaging.instance.subscribeToTopic('indirim_radari_all').catchError((_) {});
 
   // App ön planda iken gelen data mesajını da işle
   FirebaseMessaging.onMessage.listen((message) async {
@@ -219,7 +230,16 @@ void main() async {
     }
   });
 
-  runApp(const IndirimRadariApp());
+    runApp(const IndirimRadariApp());
+  }, (error, stack) {
+    FirebaseFirestore.instance.collection('crash_logs').add({
+      'type': 'zone_error',
+      'error': error.toString(),
+      'stack': stack.toString(),
+      'platform': 'ios',
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+  });
 }
 
 class SplashScreen extends StatefulWidget {
