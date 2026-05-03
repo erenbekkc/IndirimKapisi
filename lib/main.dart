@@ -177,56 +177,134 @@ Future<void> _initLocalNotifications() async {
 void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+    String? _initError;
+
+    // 1) Firebase
+    try {
+      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    } catch (e, s) {
+      _initError = 'Firebase.initializeApp FAILED:\n$e\n$s';
+      runApp(_ErrorApp(_initError!));
+      return;
+    }
+
+    // Crashlytics artık hazır
     FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-    FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
-    await MobileAds.instance.initialize();
-    await initializeDateFormatting('tr_TR', null);
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-    await _initLocalNotifications();
-    await FavoritesManager.load();
+
+    // 2) Analytics
+    try {
+      FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
+    } catch (e) {
+      FirebaseCrashlytics.instance.log('Analytics init failed: $e');
+    }
+
+    // 3) AdMob
+    try {
+      await MobileAds.instance.initialize();
+    } catch (e, s) {
+      _initError = 'MobileAds.initialize FAILED:\n$e\n$s';
+      FirebaseCrashlytics.instance.recordError(e, s, reason: 'MobileAds init');
+      runApp(_ErrorApp(_initError!));
+      return;
+    }
+
+    // 4) Date formatting
+    try {
+      await initializeDateFormatting('tr_TR', null);
+    } catch (e) {
+      FirebaseCrashlytics.instance.log('DateFormatting init failed: $e');
+    }
+
+    // 5) FCM background handler
+    try {
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    } catch (e) {
+      FirebaseCrashlytics.instance.log('FCM background handler failed: $e');
+    }
+
+    // 6) Local notifications
+    try {
+      await _initLocalNotifications();
+    } catch (e, s) {
+      _initError = 'LocalNotifications init FAILED:\n$e\n$s';
+      FirebaseCrashlytics.instance.recordError(e, s, reason: 'LocalNotifications init');
+      runApp(_ErrorApp(_initError!));
+      return;
+    }
+
+    // 7) Favorites
+    try {
+      await FavoritesManager.load();
+    } catch (e) {
+      FirebaseCrashlytics.instance.log('FavoritesManager.load failed: $e');
+    }
+
+    // 8) FCM topic
     FirebaseMessaging.instance.subscribeToTopic('indirim_radari_all').catchError((_) {});
 
-  // App ön planda iken gelen data mesajını da işle
-  FirebaseMessaging.onMessage.listen((message) async {
-    if (message.data['type'] == 'campaign_notif') {
-      final body = await _buildPersonalizedBody(message.data);
-      localNotifications.show(
-        777,
-        '🛒 İndirim Kapısı',
-        body,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'indirim_radari_channel',
-            'İndirim Bildirimleri',
-            importance: Importance.high,
-            priority: Priority.high,
+    // App ön planda iken gelen data mesajını da işle
+    FirebaseMessaging.onMessage.listen((message) async {
+      if (message.data['type'] == 'campaign_notif') {
+        final body = await _buildPersonalizedBody(message.data);
+        localNotifications.show(
+          777,
+          '🛒 İndirim Kapısı',
+          body,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'indirim_radari_channel',
+              'İndirim Bildirimleri',
+              importance: Importance.high,
+              priority: Priority.high,
+            ),
           ),
-        ),
-      );
-    } else if (message.notification != null) {
-      // Diğer FCM notification mesajları
-      final n = message.notification!;
-      localNotifications.show(
-        n.hashCode,
-        n.title,
-        n.body,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'indirim_radari_channel',
-            'İndirim Bildirimleri',
-            importance: Importance.high,
-            priority: Priority.high,
+        );
+      } else if (message.notification != null) {
+        final n = message.notification!;
+        localNotifications.show(
+          n.hashCode,
+          n.title,
+          n.body,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'indirim_radari_channel',
+              'İndirim Bildirimleri',
+              importance: Importance.high,
+              priority: Priority.high,
+            ),
           ),
-        ),
-      );
-    }
-  });
+        );
+      }
+    });
 
     runApp(const IndirimRadariApp());
   }, (error, stack) {
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
   });
+}
+
+class _ErrorApp extends StatelessWidget {
+  final String message;
+  const _ErrorApp(this.message);
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        backgroundColor: Colors.red.shade900,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              message,
+              style: const TextStyle(color: Colors.white, fontSize: 13, fontFamily: 'monospace'),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class SplashScreen extends StatefulWidget {
