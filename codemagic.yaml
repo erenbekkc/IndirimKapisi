@@ -16,14 +16,14 @@ workflows:
     cache:
       cache_paths:
         - $HOME/.pub-cache
-        - $FCI_BUILD_DIR/ios/Pods
     scripts:
       - name: Flutter pub get
         script: flutter pub get
-      - name: Install CocoaPods
+      - name: Install CocoaPods (clean)
         script: |
           cd ios
-          pod install
+          rm -rf Pods Podfile.lock
+          pod install --repo-update
       - name: Build iOS release
         script: |
           flutter build ipa \
