@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'firebase_options.dart';
 import 'favorites_manager.dart';
 import 'screens/main_screen.dart';
@@ -177,15 +178,7 @@ void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-    FlutterError.onError = (details) {
-      FirebaseFirestore.instance.collection('crash_logs').add({
-        'type': 'flutter_error',
-        'error': details.exceptionAsString(),
-        'stack': details.stack.toString(),
-        'platform': 'ios',
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-    };
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
     FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
     await MobileAds.instance.initialize();
     await initializeDateFormatting('tr_TR', null);
@@ -232,13 +225,7 @@ void main() {
 
     runApp(const IndirimRadariApp());
   }, (error, stack) {
-    FirebaseFirestore.instance.collection('crash_logs').add({
-      'type': 'zone_error',
-      'error': error.toString(),
-      'stack': stack.toString(),
-      'platform': 'ios',
-      'timestamp': FieldValue.serverTimestamp(),
-    });
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
   });
 }
 
