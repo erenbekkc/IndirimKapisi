@@ -109,6 +109,8 @@ jobs:
             -scheme Runner \
             -configuration Release \
             -archivePath build/Runner.xcarchive \
+            -destination 'generic/platform=iOS' \
+            DEVELOPMENT_TEAM=8J5Q5D5DB9 \
             archive \
             -allowProvisioningUpdates \
             -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8 \
