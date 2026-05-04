@@ -1,0 +1,38 @@
+default_platform(:ios)
+
+platform :ios do
+  lane :build_and_upload do
+    api_key = app_store_connect_api_key(
+      key_id: ENV["ASC_KEY_ID"],
+      issuer_id: ENV["ASC_ISSUER_ID"],
+      key_content: Base64.decode64(ENV["ASC_PRIVATE_KEY_B64"]),
+    )
+
+    get_certificates(
+      api_key: api_key,
+      output_path: "/tmp/certs"
+    )
+
+    get_provisioning_profile(
+      api_key: api_key,
+      app_identifier: "com.alp.indirimRadari",
+      output_path: "/tmp/profiles"
+    )
+
+    build_app(
+      workspace: "Runner.xcworkspace",
+      scheme: "Runner",
+      configuration: "Release",
+      export_method: "app-store",
+      export_options: {
+        teamID: "8J5Q5D5DB9",
+        signingStyle: "manual"
+      }
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      skip_waiting_for_build_processing: true
+    )
+  end
+end

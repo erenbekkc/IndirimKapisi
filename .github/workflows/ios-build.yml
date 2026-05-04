@@ -73,75 +73,14 @@ jobs:
         run: |
           cd ios && pod install --repo-update && cd ..
 
-      - name: Setup App Store Connect API Key
+      - name: Install Fastlane
+        run: gem install fastlane --no-document
+
+      - name: Build & Upload via Fastlane
         env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_PRIVATE_KEY_B64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
         run: |
-          mkdir -p ~/.appstoreconnect/private_keys
-          echo "$ASC_PRIVATE_KEY_B64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
-          head -1 ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
-
-      - name: Create ExportOptions.plist
-        run: |
-          cat > ExportOptions.plist << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store</string>
-            <key>signingStyle</key>
-            <string>automatic</string>
-          </dict>
-          </plist>
-          EOF
-
-      - name: Build Flutter iOS (no codesign)
-        run: flutter build ios --release --no-codesign
-
-      - name: Archive with Xcode
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-        run: |
-          xcodebuild -workspace ios/Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -archivePath build/Runner.xcarchive \
-            -destination 'generic/platform=iOS' \
-            DEVELOPMENT_TEAM=8J5Q5D5DB9 \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            CODE_SIGN_STYLE=Automatic \
-            archive \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8 \
-            -authenticationKeyID $ASC_KEY_ID \
-            -authenticationKeyIssuerID $ASC_ISSUER_ID
-
-      - name: Export IPA
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-        run: |
-          xcodebuild -exportArchive \
-            -archivePath build/Runner.xcarchive \
-            -exportPath build/ios/ipa \
-            -exportOptionsPlist ExportOptions.plist \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8 \
-            -authenticationKeyID $ASC_KEY_ID \
-            -authenticationKeyIssuerID $ASC_ISSUER_ID
-
-      - name: Upload to TestFlight
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-        run: |
-          xcrun altool --upload-app \
-            --type ios \
-            --file "$(find build/ios/ipa -name '*.ipa' | head -1)" \
-            --apiKey "$ASC_KEY_ID" \
-            --apiIssuer "$ASC_ISSUER_ID" \
-            --apiKeyPath ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8 \
-            --verbose
+          cd ios
+          fastlane build_and_upload
