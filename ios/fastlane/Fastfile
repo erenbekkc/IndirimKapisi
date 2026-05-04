@@ -1,3 +1,5 @@
+require 'base64'
+
 default_platform(:ios)
 
 platform :ios do
@@ -8,10 +10,48 @@ platform :ios do
       key_content: Base64.decode64(ENV["ASC_PRIVATE_KEY_B64"]),
     )
 
-    get_certificates(
-      api_key: api_key,
-      output_path: "/tmp/certs"
+    keychain_name = "build.keychain"
+    keychain_password = "build_password"
+    keychain_path = "#{Dir.home}/Library/Keychains/#{keychain_name}"
+
+    create_keychain(
+      name: keychain_name,
+      password: keychain_password,
+      default_keychain: true,
+      unlock: true,
+      timeout: 3600,
+      lock_when_sleeps: false
     )
+
+    if ENV["CERT_P12_BASE64"] && !ENV["CERT_P12_BASE64"].empty?
+      # Sertifika secret'tan yükle — yeni sertifika oluşturma
+      UI.message("Importing certificate from GitHub Secret...")
+      p12_path = "/tmp/distribution.p12"
+      File.write(p12_path, Base64.decode64(ENV["CERT_P12_BASE64"]))
+      import_certificate(
+        certificate_path: p12_path,
+        certificate_password: keychain_password,
+        keychain_name: keychain_name,
+        keychain_password: keychain_password
+      )
+    else
+      # İlk çalışma: yeni sertifika yarat ve base64'ünü yazdır
+      UI.message("Creating new certificate...")
+      get_certificates(
+        api_key: api_key,
+        output_path: "/tmp/certs",
+        keychain_path: keychain_path,
+        keychain_password: keychain_password
+      )
+      # Sertifikayı dışa aktar ve base64 olarak yazdır
+      sh("security export -k '#{keychain_path}' -t identities -f pkcs12 -P '#{keychain_password}' -o /tmp/export.p12 2>/dev/null || true")
+      p12_b64 = sh("base64 -i /tmp/export.p12 | tr -d '\n'", log: false).strip
+      puts "\n\n============================================"
+      puts "CERT_P12_BASE64 SECRET DEGERI (GitHub'a ekle):"
+      puts p12_b64
+      puts "CERT_P12_PASSWORD SECRET DEGERI: #{keychain_password}"
+      puts "============================================\n\n"
+    end
 
     get_provisioning_profile(
       api_key: api_key,
@@ -29,7 +69,7 @@ platform :ios do
         teamID: "8J5Q5D5DB9",
         signingStyle: "manual",
         provisioningProfiles: {
-          "com.alp.indirimRadari" => "com.alp.indirimRadari AppStore 1777916402"
+          "com.alp.indirimRadari" => lane_context[SharedValues::SIGH_NAME]
         }
       }
     )
