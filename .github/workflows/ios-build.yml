@@ -1,0 +1,142 @@
+name: iOS Build & TestFlight
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+          channel: 'stable'
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      # Fix Podfile (dynamic frameworks)
+      - name: Fix Podfile
+        run: |
+          cat > ios/Podfile << 'EOF'
+          platform :ios, '14.0'
+          ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+          project 'Runner', {
+            'Debug' => :debug,
+            'Profile' => :release,
+            'Release' => :release,
+          }
+          def flutter_root
+            generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+            unless File.exist?(generated_xcode_build_settings_path)
+              raise "#{generated_xcode_build_settings_path} must exist. Run flutter pub get first"
+            end
+            File.foreach(generated_xcode_build_settings_path) do |line|
+              matches = line.match(/FLUTTER_ROOT\=(.*)/)
+              return matches[1].strip if matches
+            end
+            raise "FLUTTER_ROOT not found"
+          end
+          require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+          flutter_ios_podfile_setup
+          target 'Runner' do
+            use_frameworks!
+            use_modular_headers!
+            flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+          end
+          post_install do |installer|
+            installer.pods_project.targets.each do |target|
+              flutter_additional_ios_build_settings(target)
+              target.build_configurations.each do |config|
+                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+              end
+            end
+          end
+          EOF
+
+      # Fix deployment target in pbxproj
+      - name: Fix pbxproj deployment target
+        run: |
+          find ios -name "*.pbxproj" -exec sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = .*/IPHONEOS_DEPLOYMENT_TARGET = 14.0;/g' {} \;
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install --repo-update
+          cd ..
+
+      # Sertifika import
+      - name: Import Distribution Certificate
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+        run: |
+          echo $CERTIFICATE_BASE64 | base64 --decode > certificate.p12
+          security create-keychain -p "build123" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "build123" build.keychain
+          security import certificate.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "build123" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+
+      # Provisioning profile install
+      - name: Install Provisioning Profile
+        env:
+          PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          echo $PROVISIONING_PROFILE_BASE64 | base64 --decode > profile.mobileprovision
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      # ExportOptions.plist oluştur
+      - name: Create ExportOptions.plist
+        run: |
+          cat > ExportOptions.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.alp.indirimRadari</key>
+              <string>${{ secrets.PROVISIONING_PROFILE_NAME }}</string>
+            </dict>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Build IPA
+        run: |
+          flutter build ipa --release --export-options-plist=ExportOptions.plist
+
+      # TestFlight'a yükle
+      - name: Upload to TestFlight
+        env:
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          echo "$APP_STORE_CONNECT_PRIVATE_KEY" > AuthKey.p8
+          xcrun altool --upload-app \
+            --type ios \
+            --file "$(find build/ios/ipa -name '*.ipa')" \
+            --apiKey "$APP_STORE_CONNECT_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID" \
+            --apiKeyPath AuthKey.p8
+          rm AuthKey.p8
