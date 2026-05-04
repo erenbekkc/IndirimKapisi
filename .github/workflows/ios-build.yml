@@ -111,6 +111,8 @@ jobs:
             -archivePath build/Runner.xcarchive \
             -destination 'generic/platform=iOS' \
             DEVELOPMENT_TEAM=8J5Q5D5DB9 \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CODE_SIGN_STYLE=Automatic \
             archive \
             -allowProvisioningUpdates \
             -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8 \
