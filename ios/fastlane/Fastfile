@@ -24,9 +24,13 @@ platform :ios do
       scheme: "Runner",
       configuration: "Release",
       export_method: "app-store",
+      xcargs: "DEVELOPMENT_TEAM=8J5Q5D5DB9 CODE_SIGN_STYLE=Manual",
       export_options: {
         teamID: "8J5Q5D5DB9",
-        signingStyle: "manual"
+        signingStyle: "manual",
+        provisioningProfiles: {
+          "com.alp.indirimRadari" => "com.alp.indirimRadari AppStore 1777916402"
+        }
       }
     )
 
