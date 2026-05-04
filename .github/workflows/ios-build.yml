@@ -75,14 +75,12 @@ jobs:
 
       - name: Setup App Store Connect API Key
         env:
-          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          ASC_PRIVATE_KEY_B64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
-          printf '%s' "$ASC_PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
-          # Satır sonlarını düzelt (GitHub Secret bazen \n olarak saklar)
-          sed -i '' 's/\\n/\n/g' ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
-          cat ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8 | head -2
+          echo "$ASC_PRIVATE_KEY_B64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+          head -1 ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
 
       - name: Create ExportOptions.plist
         run: |
