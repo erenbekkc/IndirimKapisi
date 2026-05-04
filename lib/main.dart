@@ -180,6 +180,17 @@ void main() {
 
     String? _initError;
 
+    // Native launch step diagnostic (iOS only)
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final step = prefs.getString('flutter.ios_launch_step') ?? 'not_set';
+      if (step != 'step3_after_super') {
+        // Native crashed before reaching step3 — show on screen
+        // (still continue so app might load if possible)
+        debugPrint('iOS_LAUNCH_STEP: $step');
+      }
+    } catch (_) {}
+
     // 1) Firebase
     try {
       await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -199,14 +210,13 @@ void main() {
       FirebaseCrashlytics.instance.log('Analytics init failed: $e');
     }
 
-    // 3) AdMob
+    // 3) AdMob (2 sn gecikme: iOS startup crash önlemi)
     try {
+      await Future.delayed(const Duration(seconds: 2));
       await MobileAds.instance.initialize();
     } catch (e, s) {
-      _initError = 'MobileAds.initialize FAILED:\n$e\n$s';
       FirebaseCrashlytics.instance.recordError(e, s, reason: 'MobileAds init');
-      runApp(_ErrorApp(_initError!));
-      return;
+      // AdMob hatası uygulamayı durdurmasın
     }
 
     // 4) Date formatting
