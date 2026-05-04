@@ -29,7 +29,7 @@ platform :ios do
     Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.from(hash: {
       key_id: ENV["ASC_KEY_ID"],
       issuer_id: ENV["ASC_ISSUER_ID"],
-      text: Base64.decode64(ENV["ASC_PRIVATE_KEY_B64"])
+      key: Base64.decode64(ENV["ASC_PRIVATE_KEY_B64"])
     })
     old_certs = Spaceship::ConnectAPI::Certificate.all(
       filter: { certificateType: "IOS_DISTRIBUTION" }
