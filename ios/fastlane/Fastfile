@@ -23,35 +23,29 @@ platform :ios do
       lock_when_sleeps: false
     )
 
-    if ENV["CERT_P12_BASE64"] && !ENV["CERT_P12_BASE64"].empty?
-      # Sertifika secret'tan yükle — yeni sertifika oluşturma
-      UI.message("Importing certificate from GitHub Secret...")
-      p12_path = "/tmp/distribution.p12"
-      File.write(p12_path, Base64.decode64(ENV["CERT_P12_BASE64"]))
-      import_certificate(
-        certificate_path: p12_path,
-        certificate_password: keychain_password,
-        keychain_name: keychain_name,
-        keychain_password: keychain_password
-      )
-    else
-      # İlk çalışma: yeni sertifika yarat ve base64'ünü yazdır
-      UI.message("Creating new certificate...")
-      get_certificates(
-        api_key: api_key,
-        output_path: "/tmp/certs",
-        keychain_path: keychain_path,
-        keychain_password: keychain_password
-      )
-      # Sertifikayı dışa aktar ve base64 olarak yazdır
-      sh("security export -k '#{keychain_path}' -t identities -f pkcs12 -P '#{keychain_password}' -o /tmp/export.p12 2>/dev/null || true")
-      p12_b64 = sh("base64 -i /tmp/export.p12 | tr -d '\n'", log: false).strip
-      puts "\n\n============================================"
-      puts "CERT_P12_BASE64 SECRET DEGERI (GitHub'a ekle):"
-      puts p12_b64
-      puts "CERT_P12_PASSWORD SECRET DEGERI: #{keychain_password}"
-      puts "============================================\n\n"
+    # Eski Distribution sertifikalarını API ile sil
+    UI.message("Cleaning up old Distribution certificates...")
+    require 'spaceship'
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.from(hash: {
+      key_id: ENV["ASC_KEY_ID"],
+      issuer_id: ENV["ASC_ISSUER_ID"],
+      text: Base64.decode64(ENV["ASC_PRIVATE_KEY_B64"])
+    })
+    old_certs = Spaceship::ConnectAPI::Certificate.all(
+      filter: { certificateType: "IOS_DISTRIBUTION" }
+    )
+    old_certs.each do |cert|
+      UI.message("Deleting old certificate: #{cert.name} (#{cert.id})")
+      cert.delete!
     end
+
+    # Yeni sertifika oluştur
+    get_certificates(
+      api_key: api_key,
+      output_path: "/tmp/certs",
+      keychain_path: keychain_path,
+      keychain_password: keychain_password
+    )
 
     get_provisioning_profile(
       api_key: api_key,
