@@ -10,7 +10,8 @@ platform :ios do
 
     get_certificates(
       api_key: api_key,
-      output_path: "/tmp/certs"
+      output_path: "/tmp/certs",
+      force: true
     )
 
     get_provisioning_profile(
