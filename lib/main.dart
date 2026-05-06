@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -28,11 +29,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   if (message.data['type'] != 'campaign_notif') return;
 
-  // Arka planda plugin'i yeniden başlat
   final plugin = FlutterLocalNotificationsPlugin();
   await plugin.initialize(
     const InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      iOS: DarwinInitializationSettings(),
     ),
   );
 
@@ -50,6 +51,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         priority: Priority.high,
         icon: '@mipmap/ic_launcher',
       ),
+      iOS: DarwinNotificationDetails(),
     ),
   );
 }
@@ -180,17 +182,6 @@ void main() {
 
     String? _initError;
 
-    // Native launch step diagnostic (iOS only)
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final step = prefs.getString('flutter.ios_launch_step') ?? 'not_set';
-      if (step != 'step3_after_super') {
-        // Native crashed before reaching step3 — show on screen
-        // (still continue so app might load if possible)
-        debugPrint('iOS_LAUNCH_STEP: $step');
-      }
-    } catch (_) {}
-
     // 1) Firebase
     try {
       await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -210,13 +201,13 @@ void main() {
       FirebaseCrashlytics.instance.log('Analytics init failed: $e');
     }
 
-    // 3) AdMob (2 sn gecikme: iOS startup crash önlemi)
-    try {
-      await Future.delayed(const Duration(seconds: 2));
-      await MobileAds.instance.initialize();
-    } catch (e, s) {
-      FirebaseCrashlytics.instance.recordError(e, s, reason: 'MobileAds init');
-      // AdMob hatası uygulamayı durdurmasın
+    // 3) AdMob (sadece Android)
+    if (!Platform.isIOS) {
+      try {
+        await MobileAds.instance.initialize();
+      } catch (e, s) {
+        FirebaseCrashlytics.instance.recordError(e, s, reason: 'MobileAds init');
+      }
     }
 
     // 4) Date formatting
@@ -268,6 +259,7 @@ void main() {
               importance: Importance.high,
               priority: Priority.high,
             ),
+            iOS: DarwinNotificationDetails(),
           ),
         );
       } else if (message.notification != null) {
@@ -283,6 +275,7 @@ void main() {
               importance: Importance.high,
               priority: Priority.high,
             ),
+            iOS: DarwinNotificationDetails(),
           ),
         );
       }
