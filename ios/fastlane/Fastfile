@@ -12,6 +12,7 @@ platform :ios do
 
     keychain_name = "build.keychain"
     keychain_password = "build_password"
+    keychain_path = "#{Dir.home}/Library/Keychains/#{keychain_name}-db"
 
     create_keychain(
       name: keychain_name,
@@ -26,7 +27,7 @@ platform :ios do
     cert(
       api_key: api_key,
       output_path: "/tmp/certs",
-      keychain_name: keychain_name,
+      keychain_path: keychain_path,
       keychain_password: keychain_password,
     )
 
