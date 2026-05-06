@@ -10,64 +10,29 @@ platform :ios do
       key_content: Base64.decode64(ENV["ASC_PRIVATE_KEY_B64"]),
     )
 
-    keychain_name = "build.keychain"
-    keychain_password = "build_password"
-    keychain_path = "#{Dir.home}/Library/Keychains/#{keychain_name}-db"
+    # xcodebuild -allowProvisioningUpdates için API key'i dosyaya yaz
+    auth_key_path = "/tmp/AuthKey_#{ENV['ASC_KEY_ID']}.p8"
+    File.write(auth_key_path, Base64.decode64(ENV["ASC_PRIVATE_KEY_B64"]))
 
-    create_keychain(
-      name: keychain_name,
-      password: keychain_password,
-      default_keychain: true,
-      unlock: true,
-      timeout: 3600,
-      lock_when_sleeps: false
+    # Xcode projesini automatic signing moduna al
+    update_code_signing_settings(
+      use_automatic_signing: true,
+      path: "Runner.xcodeproj",
+      team_id: "8J5Q5D5DB9",
+      bundle_identifier: "com.alp.indirimRadari",
     )
 
-    # Eski Distribution sertifikalarını API ile sil
-    UI.message("Cleaning up old Distribution certificates...")
-    require 'spaceship'
-    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.from(hash: {
-      key_id: ENV["ASC_KEY_ID"],
-      issuer_id: ENV["ASC_ISSUER_ID"],
-      key: Base64.decode64(ENV["ASC_PRIVATE_KEY_B64"])
-    })
-    old_certs = Spaceship::ConnectAPI::Certificate.all(
-      filter: { certificateType: "IOS_DISTRIBUTION" }
-    )
-    old_certs.each do |cert|
-      UI.message("Deleting old certificate: #{cert.name} (#{cert.id})")
-      cert.delete!
-    end
-
-    # Yeni sertifika oluştur
-    get_certificates(
-      api_key: api_key,
-      output_path: "/tmp/certs",
-      keychain_path: keychain_path,
-      keychain_password: keychain_password
-    )
-
-    get_provisioning_profile(
-      api_key: api_key,
-      app_identifier: "com.alp.indirimRadari",
-      output_path: "/tmp/profiles"
-    )
-
-    profile_uuid = lane_context[SharedValues::SIGH_UUID]
-    profile_name = lane_context[SharedValues::SIGH_NAME]
-
+    # -allowProvisioningUpdates: sertifika limiti dolunca eskisini silip yenisini oluşturur
     build_app(
       workspace: "Runner.xcworkspace",
       scheme: "Runner",
       configuration: "Release",
+      xcargs: "-allowProvisioningUpdates -authenticationKeyPath #{auth_key_path} -authenticationKeyID #{ENV['ASC_KEY_ID']} -authenticationKeyIssuerID #{ENV['ASC_ISSUER_ID']}",
       export_method: "app-store",
-      xcargs: "DEVELOPMENT_TEAM=8J5Q5D5DB9 CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE='#{profile_uuid}'",
       export_options: {
+        method: "app-store",
         teamID: "8J5Q5D5DB9",
-        signingStyle: "manual",
-        provisioningProfiles: {
-          "com.alp.indirimRadari" => profile_name
-        }
+        signingStyle: "automatic",
       }
     )
 
