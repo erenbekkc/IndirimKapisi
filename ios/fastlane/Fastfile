@@ -10,29 +10,48 @@ platform :ios do
       key_content: Base64.decode64(ENV["ASC_PRIVATE_KEY_B64"]),
     )
 
-    # xcodebuild -allowProvisioningUpdates için API key'i dosyaya yaz
-    auth_key_path = "/tmp/AuthKey_#{ENV['ASC_KEY_ID']}.p8"
-    File.write(auth_key_path, Base64.decode64(ENV["ASC_PRIVATE_KEY_B64"]))
+    keychain_name = "build.keychain"
+    keychain_password = "build_password"
 
-    # Xcode projesini automatic signing moduna al
-    update_code_signing_settings(
-      use_automatic_signing: true,
-      path: "Runner.xcodeproj",
-      team_id: "8J5Q5D5DB9",
-      bundle_identifier: "com.alp.indirimRadari",
+    create_keychain(
+      name: keychain_name,
+      password: keychain_password,
+      default_keychain: true,
+      unlock: true,
+      timeout: 3600,
+      lock_when_sleeps: false
     )
 
-    # -allowProvisioningUpdates: sertifika limiti dolunca eskisini silip yenisini oluşturur
+    # Distribution sertifikası oluştur (önceki sertifikalar silindi, limit yok)
+    cert(
+      api_key: api_key,
+      output_path: "/tmp/certs",
+      keychain_name: keychain_name,
+      keychain_password: keychain_password,
+    )
+
+    # App Store Distribution provisioning profile indir/oluştur (cihaz gerekmez)
+    sigh(
+      api_key: api_key,
+      app_identifier: "com.alp.indirimRadari",
+      output_path: "/tmp/profiles",
+    )
+
+    profile_uuid = lane_context[SharedValues::SIGH_UUID]
+
     build_app(
       workspace: "Runner.xcworkspace",
       scheme: "Runner",
       configuration: "Release",
-      xcargs: "-allowProvisioningUpdates -authenticationKeyPath #{auth_key_path} -authenticationKeyID #{ENV['ASC_KEY_ID']} -authenticationKeyIssuerID #{ENV['ASC_ISSUER_ID']}",
       export_method: "app-store",
+      xcargs: "CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=8J5Q5D5DB9",
       export_options: {
         method: "app-store",
         teamID: "8J5Q5D5DB9",
-        signingStyle: "automatic",
+        signingStyle: "manual",
+        provisioningProfiles: {
+          "com.alp.indirimRadari" => profile_uuid
+        }
       }
     )
 
