@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../ad_helper.dart';
@@ -16,7 +17,9 @@ class _NativeAdWidgetState extends State<NativeAdWidget> {
   @override
   void initState() {
     super.initState();
-    _loadAd();
+    // iOS'ta 'campaignCardAd' factory AppDelegate'e kayıtlı olmadığından
+    // native crash oluyor. iOS'ta native ad yüklenmez.
+    if (!Platform.isIOS) _loadAd();
   }
 
   void _loadAd() {
