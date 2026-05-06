@@ -39,19 +39,30 @@ platform :ios do
     )
 
     profile_uuid = lane_context[SharedValues::SIGH_UUID]
+    profile_name = lane_context[SharedValues::SIGH_NAME]
+
+    # Projeyi manual signing + doğru profil ile güncelle
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "Runner.xcodeproj",
+      team_id: "8J5Q5D5DB9",
+      bundle_identifier: "com.alp.indirimRadari",
+      code_sign_identity: "iPhone Distribution",
+      profile_uuid: profile_uuid,
+    )
 
     build_app(
       workspace: "Runner.xcworkspace",
       scheme: "Runner",
       configuration: "Release",
       export_method: "app-store",
-      xcargs: "CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=8J5Q5D5DB9",
+      xcargs: "CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=8J5Q5D5DB9 PROVISIONING_PROFILE='#{profile_uuid}' CODE_SIGN_IDENTITY='iPhone Distribution'",
       export_options: {
         method: "app-store",
         teamID: "8J5Q5D5DB9",
         signingStyle: "manual",
         provisioningProfiles: {
-          "com.alp.indirimRadari" => profile_uuid
+          "com.alp.indirimRadari" => profile_name
         }
       }
     )
