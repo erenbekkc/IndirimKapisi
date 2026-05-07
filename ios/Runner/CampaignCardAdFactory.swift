@@ -1,10 +1,11 @@
 import Flutter
+import UIKit
 import GoogleMobileAds
 
 class CampaignCardAdFactory: NSObject, FLTNativeAdFactory {
-  func createNativeAd(_ nativeAd: NativeAd, customOptions: [AnyHashable: Any]? = nil) -> NativeAdView? {
-    let adView = NativeAdView()
-    adView.backgroundColor = .white
+  func createNativeAd(_ nativeAd: GADNativeAd, customOptions: [AnyHashable: Any]? = nil) -> GADNativeAdView? {
+    let adView = GADNativeAdView()
+    adView.backgroundColor = UIColor.white
     adView.layer.cornerRadius = 12
     adView.layer.masksToBounds = true
     adView.layer.borderWidth = 0.5
@@ -14,14 +15,14 @@ class CampaignCardAdFactory: NSObject, FLTNativeAdFactory {
     let headlineLabel = UILabel()
     headlineLabel.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
     headlineLabel.numberOfLines = 2
-    headlineLabel.textColor = .label
+    headlineLabel.textColor = UIColor.label
     headlineLabel.text = nativeAd.headline
     adView.headlineView = headlineLabel
 
     // Body
     let bodyLabel = UILabel()
     bodyLabel.font = UIFont.systemFont(ofSize: 12)
-    bodyLabel.textColor = .secondaryLabel
+    bodyLabel.textColor = UIColor.secondaryLabel
     bodyLabel.numberOfLines = 2
     bodyLabel.text = nativeAd.body
     adView.bodyView = bodyLabel
@@ -40,7 +41,7 @@ class CampaignCardAdFactory: NSObject, FLTNativeAdFactory {
     let ctaButton = UIButton(type: .system)
     ctaButton.setTitle(nativeAd.callToAction, for: .normal)
     ctaButton.titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
-    ctaButton.setTitleColor(.white, for: .normal)
+    ctaButton.setTitleColor(UIColor.white, for: .normal)
     ctaButton.backgroundColor = UIColor(red: 0.09, green: 0.64, blue: 0.29, alpha: 1)
     ctaButton.layer.cornerRadius = 8
     ctaButton.isUserInteractionEnabled = false
