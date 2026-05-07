@@ -44,13 +44,10 @@ class _ProfilScreenState extends State<ProfilScreen> {
 
   Future<void> _ensureApnsToken() async {
     if (!Platform.isIOS) return;
-    await FirebaseMessaging.instance.requestPermission();
-    for (int i = 0; i < 20; i++) {
+    // Token app açılışında hazırlanmış olmalı, kısa süre bekle
+    for (int i = 0; i < 10; i++) {
       final apns = await FirebaseMessaging.instance.getAPNSToken();
-      if (apns != null) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        return;
-      }
+      if (apns != null) return;
       await Future.delayed(const Duration(seconds: 1));
     }
     throw Exception('Bildirim izni verilmedi. Ayarlar > Bildirimler > İndirim Kapısı bölümünden açabilirsiniz.');

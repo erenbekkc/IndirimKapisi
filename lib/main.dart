@@ -239,17 +239,22 @@ void main() {
       FirebaseCrashlytics.instance.log('FavoritesManager.load failed: $e');
     }
 
-    // 8) FCM topic — iOS'ta APNS token hazır olana kadar bekle
-    Future(() async {
-      if (Platform.isIOS) {
-        for (int i = 0; i < 10; i++) {
-          final apns = await FirebaseMessaging.instance.getAPNSToken();
-          if (apns != null) break;
-          await Future.delayed(const Duration(seconds: 1));
-        }
-      }
+    // 8) iOS: izin al ve APNS token'ı arka planda hazırla (Android gibi otomatik)
+    if (Platform.isIOS) {
+      Future(() async {
+        try {
+          await FirebaseMessaging.instance.requestPermission();
+          for (int i = 0; i < 30; i++) {
+            final apns = await FirebaseMessaging.instance.getAPNSToken();
+            if (apns != null) break;
+            await Future.delayed(const Duration(seconds: 1));
+          }
+        } catch (_) {}
+        FirebaseMessaging.instance.subscribeToTopic('indirim_radari_all').catchError((_) {});
+      });
+    } else {
       FirebaseMessaging.instance.subscribeToTopic('indirim_radari_all').catchError((_) {});
-    });
+    }
 
     // App ön planda iken gelen data mesajını da işle
     FirebaseMessaging.onMessage.listen((message) async {
