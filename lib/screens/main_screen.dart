@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'favoriler_screen.dart';
@@ -50,6 +51,8 @@ class _MainScreenState extends State<MainScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (i) => setState(() => _currentIndex = i),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        animationDuration: Platform.isIOS ? Duration.zero : const Duration(milliseconds: 500),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.door_front_door_outlined),

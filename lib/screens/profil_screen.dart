@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -41,9 +42,21 @@ class _ProfilScreenState extends State<ProfilScreen> {
     });
   }
 
+  Future<void> _ensureApnsToken() async {
+    if (!Platform.isIOS) return;
+    String? apnsToken;
+    for (int i = 0; i < 10; i++) {
+      apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+      if (apnsToken != null) return;
+      await Future.delayed(const Duration(seconds: 1));
+    }
+    throw Exception('APNS token alınamadı. Lütfen tekrar deneyin.');
+  }
+
   Future<void> _subscribeAll() async {
     setState(() => _subscribingAll = true);
     try {
+      await _ensureApnsToken();
       final prefs = await SharedPreferences.getInstance();
       final marketsSnap = await FirebaseFirestore.instance.collection('markets').get();
       final categoriesSnap = await FirebaseFirestore.instance.collection('categories').get();
@@ -78,6 +91,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
     final prefs = await SharedPreferences.getInstance();
     final safeTopic = 'market_${_normalizeTopicKey(topicKey)}';
     try {
+      await _ensureApnsToken();
       if (subscribe) {
         await FirebaseMessaging.instance.subscribeToTopic(safeTopic);
         _subscribedMarkets.add(topicKey);
@@ -100,6 +114,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
     final prefs = await SharedPreferences.getInstance();
     final safeTopic = 'category_${_normalizeTopicKey(topicKey)}';
     try {
+      await _ensureApnsToken();
       if (subscribe) {
         await FirebaseMessaging.instance.subscribeToTopic(safeTopic);
         _subscribedCategories.add(topicKey);
