@@ -239,8 +239,17 @@ void main() {
       FirebaseCrashlytics.instance.log('FavoritesManager.load failed: $e');
     }
 
-    // 8) FCM topic
-    FirebaseMessaging.instance.subscribeToTopic('indirim_radari_all').catchError((_) {});
+    // 8) FCM topic — iOS'ta APNS token hazır olana kadar bekle
+    Future(() async {
+      if (Platform.isIOS) {
+        for (int i = 0; i < 10; i++) {
+          final apns = await FirebaseMessaging.instance.getAPNSToken();
+          if (apns != null) break;
+          await Future.delayed(const Duration(seconds: 1));
+        }
+      }
+      FirebaseMessaging.instance.subscribeToTopic('indirim_radari_all').catchError((_) {});
+    });
 
     // App ön planda iken gelen data mesajını da işle
     FirebaseMessaging.onMessage.listen((message) async {
@@ -384,11 +393,11 @@ class IndirimRadariApp extends StatelessWidget {
             if (states.contains(WidgetState.selected)) {
               return const TextStyle(
                 fontSize: 11,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w500,
                 color: Color(0xFF16A34A),
               );
             }
-            return const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF));
+            return const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Color(0xFF9CA3AF));
           }),
           iconTheme: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
