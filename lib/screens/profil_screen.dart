@@ -44,20 +44,40 @@ class _ProfilScreenState extends State<ProfilScreen> {
 
   Future<void> _ensureApnsToken() async {
     if (!Platform.isIOS) return;
-    // Bildirim izni iste (daha önce verilmişse tekrar sormaz)
     await FirebaseMessaging.instance.requestPermission();
-    // APNS token hazır olana kadar bekle
-    String? apnsToken;
-    for (int i = 0; i < 15; i++) {
-      apnsToken = await FirebaseMessaging.instance.getAPNSToken();
-      if (apnsToken != null) break;
+    for (int i = 0; i < 20; i++) {
+      final apns = await FirebaseMessaging.instance.getAPNSToken();
+      if (apns != null) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        return;
+      }
       await Future.delayed(const Duration(seconds: 1));
     }
-    if (apnsToken == null) {
-      throw Exception('Bildirim izni verilmedi. Lütfen ayarlardan izni açın.');
+    throw Exception('Bildirim izni verilmedi. Ayarlar > Bildirimler > İndirim Kapısı bölümünden açabilirsiniz.');
+  }
+
+  Future<void> _safeSubscribe(String topic) async {
+    for (int i = 0; i < 5; i++) {
+      try {
+        await FirebaseMessaging.instance.subscribeToTopic(topic);
+        return;
+      } catch (_) {
+        if (i == 4) rethrow;
+        await Future.delayed(const Duration(seconds: 2));
+      }
     }
-    // FCM token al — FCM'in APNS kaydını tamamlaması için gerekli
-    await FirebaseMessaging.instance.getToken();
+  }
+
+  Future<void> _safeUnsubscribe(String topic) async {
+    for (int i = 0; i < 5; i++) {
+      try {
+        await FirebaseMessaging.instance.unsubscribeFromTopic(topic);
+        return;
+      } catch (_) {
+        if (i == 4) rethrow;
+        await Future.delayed(const Duration(seconds: 2));
+      }
+    }
   }
 
   Future<void> _subscribeAll() async {
@@ -69,13 +89,13 @@ class _ProfilScreenState extends State<ProfilScreen> {
       final categoriesSnap = await FirebaseFirestore.instance.collection('categories').get();
       for (final doc in marketsSnap.docs) {
         final topicKey = doc.get('topicKey') as String? ?? doc.id;
-        await FirebaseMessaging.instance.subscribeToTopic('market_${_normalizeTopicKey(topicKey)}');
+        await _safeSubscribe('market_${_normalizeTopicKey(topicKey)}');
         _subscribedMarkets.add(topicKey);
       }
       await prefs.setStringList('subscribed_markets', _subscribedMarkets.toList());
       for (final doc in categoriesSnap.docs) {
         final topicKey = doc.get('topicKey') as String? ?? doc.id;
-        await FirebaseMessaging.instance.subscribeToTopic('category_${_normalizeTopicKey(topicKey)}');
+        await _safeSubscribe('category_${_normalizeTopicKey(topicKey)}');
         _subscribedCategories.add(topicKey);
       }
       await prefs.setStringList('subscribed_categories', _subscribedCategories.toList());
@@ -100,10 +120,10 @@ class _ProfilScreenState extends State<ProfilScreen> {
     try {
       await _ensureApnsToken();
       if (subscribe) {
-        await FirebaseMessaging.instance.subscribeToTopic(safeTopic);
+        await _safeSubscribe(safeTopic);
         _subscribedMarkets.add(topicKey);
       } else {
-        await FirebaseMessaging.instance.unsubscribeFromTopic(safeTopic);
+        await _safeUnsubscribe(safeTopic);
         _subscribedMarkets.remove(topicKey);
       }
       await prefs.setStringList('subscribed_markets', _subscribedMarkets.toList());
@@ -123,10 +143,10 @@ class _ProfilScreenState extends State<ProfilScreen> {
     try {
       await _ensureApnsToken();
       if (subscribe) {
-        await FirebaseMessaging.instance.subscribeToTopic(safeTopic);
+        await _safeSubscribe(safeTopic);
         _subscribedCategories.add(topicKey);
       } else {
-        await FirebaseMessaging.instance.unsubscribeFromTopic(safeTopic);
+        await _safeUnsubscribe(safeTopic);
         _subscribedCategories.remove(topicKey);
       }
       await prefs.setStringList('subscribed_categories', _subscribedCategories.toList());
