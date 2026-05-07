@@ -201,13 +201,11 @@ void main() {
       FirebaseCrashlytics.instance.log('Analytics init failed: $e');
     }
 
-    // 3) AdMob (sadece Android)
-    if (!Platform.isIOS) {
-      try {
-        await MobileAds.instance.initialize();
-      } catch (e, s) {
-        FirebaseCrashlytics.instance.recordError(e, s, reason: 'MobileAds init');
-      }
+    // 3) AdMob
+    try {
+      await MobileAds.instance.initialize();
+    } catch (e, s) {
+      FirebaseCrashlytics.instance.recordError(e, s, reason: 'MobileAds init');
     }
 
     // 4) Date formatting
