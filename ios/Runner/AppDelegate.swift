@@ -1,6 +1,7 @@
 import Flutter
 import UIKit
 import GoogleMobileAds
+import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -9,6 +10,9 @@ import GoogleMobileAds
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
+
+    UNUserNotificationCenter.current().delegate = self
+    application.registerForRemoteNotifications()
 
     FLTGoogleMobileAdsPlugin.registerNativeAdFactory(
       self,
