@@ -31,13 +31,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!Platform.isIOS) return;
     final quickToken = await FirebaseMessaging.instance.getAPNSToken();
     if (quickToken != null) return;
-    final settings = await FirebaseMessaging.instance.requestPermission();
-    if (settings.authorizationStatus == AuthorizationStatus.denied) {
+
+    final current = await FirebaseMessaging.instance.getNotificationSettings();
+    if (current.authorizationStatus == AuthorizationStatus.notDetermined) {
+      final requested = await FirebaseMessaging.instance.requestPermission();
+      if (requested.authorizationStatus == AuthorizationStatus.denied) {
+        throw Exception(
+          'Bildirim izni verilmedi. '
+          'Ayarlar > Bildirimler > İndirim Kapısı bölümünden açabilirsiniz.',
+        );
+      }
+    } else if (current.authorizationStatus == AuthorizationStatus.denied) {
       throw Exception(
         'Bildirim izni verilmedi. '
         'Ayarlar > Bildirimler > İndirim Kapısı bölümünden açabilirsiniz.',
       );
     }
+
     for (int i = 0; i < 8; i++) {
       final apns = await FirebaseMessaging.instance.getAPNSToken();
       if (apns != null) return;

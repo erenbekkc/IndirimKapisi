@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -40,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _setupNotifications() async {
+    if (Platform.isIOS) return; // main.dart iOS için APNS token bekleyerek hallediyor
     await FirebaseMessaging.instance.requestPermission();
     await FirebaseMessaging.instance.subscribeToTopic('indirim_radari_all');
   }
