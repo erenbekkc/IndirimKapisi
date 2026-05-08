@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -26,6 +27,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _loading = true;
   bool _subscribingAll = false;
 
+  Future<void> _ensureApnsToken() async {
+    if (!Platform.isIOS) return;
+    final quickToken = await FirebaseMessaging.instance.getAPNSToken();
+    if (quickToken != null) return;
+    final settings = await FirebaseMessaging.instance.requestPermission();
+    if (settings.authorizationStatus == AuthorizationStatus.denied) {
+      throw Exception(
+        'Bildirim izni verilmedi. '
+        'Ayarlar > Bildirimler > İndirim Kapısı bölümünden açabilirsiniz.',
+      );
+    }
+    for (int i = 0; i < 8; i++) {
+      final apns = await FirebaseMessaging.instance.getAPNSToken();
+      if (apns != null) return;
+      await Future.delayed(const Duration(seconds: 1));
+    }
+    throw Exception(
+      'Bildirim bağlantısı kurulamadı. '
+      'Birkaç saniye bekleyip tekrar deneyin.',
+    );
+  }
+
+  Future<void> _safeSubscribe(String topic) async {
+    for (int i = 0; i < 5; i++) {
+      try {
+        await FirebaseMessaging.instance.subscribeToTopic(topic);
+        return;
+      } catch (_) {
+        if (i == 4) rethrow;
+        await Future.delayed(const Duration(seconds: 2));
+      }
+    }
+  }
+
+  Future<void> _safeUnsubscribe(String topic) async {
+    for (int i = 0; i < 5; i++) {
+      try {
+        await FirebaseMessaging.instance.unsubscribeFromTopic(topic);
+        return;
+      } catch (_) {
+        if (i == 4) rethrow;
+        await Future.delayed(const Duration(seconds: 2));
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -45,11 +92,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     final safeTopic = 'market_${_normalizeTopicKey(topicKey)}';
     try {
+      await _ensureApnsToken();
       if (subscribe) {
-        await FirebaseMessaging.instance.subscribeToTopic(safeTopic);
+        await _safeSubscribe(safeTopic);
         _subscribedMarkets.add(topicKey);
       } else {
-        await FirebaseMessaging.instance.unsubscribeFromTopic(safeTopic);
+        await _safeUnsubscribe(safeTopic);
         _subscribedMarkets.remove(topicKey);
       }
       await prefs.setStringList('subscribed_markets', _subscribedMarkets.toList());
@@ -66,6 +114,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _subscribeAll() async {
     setState(() => _subscribingAll = true);
     try {
+      await _ensureApnsToken();
       final prefs = await SharedPreferences.getInstance();
       final marketsSnap = await FirebaseFirestore.instance.collection('markets').get();
       final categoriesSnap = await FirebaseFirestore.instance.collection('categories').get();
@@ -73,7 +122,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       for (final doc in marketsSnap.docs) {
         final topicKey = doc.get('topicKey') as String? ?? doc.id;
         final safeTopic = 'market_${_normalizeTopicKey(topicKey)}';
-        await FirebaseMessaging.instance.subscribeToTopic(safeTopic);
+        await _safeSubscribe(safeTopic);
         _subscribedMarkets.add(topicKey);
       }
       await prefs.setStringList('subscribed_markets', _subscribedMarkets.toList());
@@ -81,7 +130,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       for (final doc in categoriesSnap.docs) {
         final topicKey = doc.get('topicKey') as String? ?? doc.id;
         final safeTopic = 'category_${_normalizeTopicKey(topicKey)}';
-        await FirebaseMessaging.instance.subscribeToTopic(safeTopic);
+        await _safeSubscribe(safeTopic);
         _subscribedCategories.add(topicKey);
       }
       await prefs.setStringList('subscribed_categories', _subscribedCategories.toList());
@@ -109,11 +158,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     final safeTopic = 'category_${_normalizeTopicKey(topicKey)}';
     try {
+      await _ensureApnsToken();
       if (subscribe) {
-        await FirebaseMessaging.instance.subscribeToTopic(safeTopic);
+        await _safeSubscribe(safeTopic);
         _subscribedCategories.add(topicKey);
       } else {
-        await FirebaseMessaging.instance.unsubscribeFromTopic(safeTopic);
+        await _safeUnsubscribe(safeTopic);
         _subscribedCategories.remove(topicKey);
       }
       await prefs.setStringList('subscribed_categories', _subscribedCategories.toList());
