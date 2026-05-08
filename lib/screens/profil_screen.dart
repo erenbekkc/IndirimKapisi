@@ -42,8 +42,10 @@ class _ProfilScreenState extends State<ProfilScreen> {
     });
   }
 
-  Future<void> _ensureNotificationPermission() async {
+  Future<void> _ensureApnsToken() async {
     if (!Platform.isIOS) return;
+
+    // İzin kontrolü
     final current = await FirebaseMessaging.instance.getNotificationSettings();
     if (current.authorizationStatus == AuthorizationStatus.notDetermined) {
       final requested = await FirebaseMessaging.instance.requestPermission();
@@ -58,6 +60,12 @@ class _ProfilScreenState extends State<ProfilScreen> {
         'Bildirim izni verilmedi. '
         'Ayarlar > Bildirimler > İndirim Kapısı bölümünden açabilirsiniz.',
       );
+    }
+
+    // APNS token hazır olana kadar bekle (AppDelegate explicit olarak set ediyor)
+    for (int i = 0; i < 15; i++) {
+      if (await FirebaseMessaging.instance.getAPNSToken() != null) return;
+      await Future.delayed(const Duration(seconds: 1));
     }
   }
 
@@ -88,7 +96,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
   Future<void> _subscribeAll() async {
     setState(() => _subscribingAll = true);
     try {
-      await _ensureNotificationPermission();
+      await _ensureApnsToken();
       final prefs = await SharedPreferences.getInstance();
       final marketsSnap = await FirebaseFirestore.instance.collection('markets').get();
       final categoriesSnap = await FirebaseFirestore.instance.collection('categories').get();
@@ -123,7 +131,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
     final prefs = await SharedPreferences.getInstance();
     final safeTopic = 'market_${_normalizeTopicKey(topicKey)}';
     try {
-      await _ensureNotificationPermission();
+      await _ensureApnsToken();
       if (subscribe) {
         await _safeSubscribe(safeTopic);
         _subscribedMarkets.add(topicKey);
@@ -146,7 +154,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
     final prefs = await SharedPreferences.getInstance();
     final safeTopic = 'category_${_normalizeTopicKey(topicKey)}';
     try {
-      await _ensureNotificationPermission();
+      await _ensureApnsToken();
       if (subscribe) {
         await _safeSubscribe(safeTopic);
         _subscribedCategories.add(topicKey);
