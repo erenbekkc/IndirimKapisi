@@ -42,16 +42,10 @@ class _ProfilScreenState extends State<ProfilScreen> {
     });
   }
 
-  Future<void> _ensureApnsToken() async {
+  Future<void> _ensureNotificationPermission() async {
     if (!Platform.isIOS) return;
-
-    final quickToken = await FirebaseMessaging.instance.getAPNSToken();
-    if (quickToken != null) return;
-
-    // Mevcut izin durumunu dialog göstermeden oku
     final current = await FirebaseMessaging.instance.getNotificationSettings();
     if (current.authorizationStatus == AuthorizationStatus.notDetermined) {
-      // Henüz sorulmamış — izin iste
       final requested = await FirebaseMessaging.instance.requestPermission();
       if (requested.authorizationStatus == AuthorizationStatus.denied) {
         throw Exception(
@@ -65,18 +59,6 @@ class _ProfilScreenState extends State<ProfilScreen> {
         'Ayarlar > Bildirimler > İndirim Kapısı bölümünden açabilirsiniz.',
       );
     }
-    // authorized / provisional / ephemeral → token bekle
-
-    for (int i = 0; i < 8; i++) {
-      final apns = await FirebaseMessaging.instance.getAPNSToken();
-      if (apns != null) return;
-      await Future.delayed(const Duration(seconds: 1));
-    }
-
-    throw Exception(
-      'Bildirim bağlantısı kurulamadı. '
-      'Birkaç saniye bekleyip tekrar deneyin.',
-    );
   }
 
   Future<void> _safeSubscribe(String topic) async {
@@ -106,7 +88,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
   Future<void> _subscribeAll() async {
     setState(() => _subscribingAll = true);
     try {
-      await _ensureApnsToken();
+      await _ensureNotificationPermission();
       final prefs = await SharedPreferences.getInstance();
       final marketsSnap = await FirebaseFirestore.instance.collection('markets').get();
       final categoriesSnap = await FirebaseFirestore.instance.collection('categories').get();
@@ -141,7 +123,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
     final prefs = await SharedPreferences.getInstance();
     final safeTopic = 'market_${_normalizeTopicKey(topicKey)}';
     try {
-      await _ensureApnsToken();
+      await _ensureNotificationPermission();
       if (subscribe) {
         await _safeSubscribe(safeTopic);
         _subscribedMarkets.add(topicKey);
@@ -164,7 +146,7 @@ class _ProfilScreenState extends State<ProfilScreen> {
     final prefs = await SharedPreferences.getInstance();
     final safeTopic = 'category_${_normalizeTopicKey(topicKey)}';
     try {
-      await _ensureApnsToken();
+      await _ensureNotificationPermission();
       if (subscribe) {
         await _safeSubscribe(safeTopic);
         _subscribedCategories.add(topicKey);
