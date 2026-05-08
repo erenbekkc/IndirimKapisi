@@ -54,6 +54,8 @@
 		<string>fetch</string>
 		<string>remote-notification</string>
 	</array>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<false/>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-2034415381778097~8817994172</string>
 	<key>NSUserTrackingUsageDescription</key>
