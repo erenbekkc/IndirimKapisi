@@ -4,6 +4,22 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+Future<void> saveUserPrefsToFirestore({
+  required Set<String> markets,
+  required Set<String> categories,
+}) async {
+  try {
+    final token = await FirebaseMessaging.instance.getToken();
+    if (token == null) return;
+    await FirebaseFirestore.instance.collection('user_prefs').doc(token).set({
+      'token':      token,
+      'markets':    markets.toList(),
+      'categories': categories.toList(),
+      'updatedAt':  FieldValue.serverTimestamp(),
+    });
+  } catch (_) {}
+}
+
 String _normalizeTopicKey(String key) {
   const tr = 'şŞıİğĞüÜöÖçÇ';
   const en = 'sSiIgGuUoOcC';
@@ -105,6 +121,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
       await prefs.setStringList('subscribed_markets', _subscribedMarkets.toList());
       setState(() {});
+      saveUserPrefsToFirestore(markets: _subscribedMarkets, categories: _subscribedCategories);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -138,6 +155,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
       await prefs.setStringList('subscribed_categories', _subscribedCategories.toList());
 
+      saveUserPrefsToFirestore(markets: _subscribedMarkets, categories: _subscribedCategories);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -171,6 +189,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
       await prefs.setStringList('subscribed_categories', _subscribedCategories.toList());
       setState(() {});
+      saveUserPrefsToFirestore(markets: _subscribedMarkets, categories: _subscribedCategories);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

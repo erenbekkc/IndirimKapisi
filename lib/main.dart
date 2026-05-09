@@ -10,11 +10,13 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'firebase_options.dart';
 import 'favorites_manager.dart';
 import 'screens/main_screen.dart';
+import 'screens/settings_screen.dart' show saveUserPrefsToFirestore;
 
 final FlutterLocalNotificationsPlugin localNotifications = FlutterLocalNotificationsPlugin();
 
@@ -201,28 +203,41 @@ void main() {
       FirebaseCrashlytics.instance.log('Analytics init failed: $e');
     }
 
-    // 3) AdMob
+    // 3) ATT (iOS) — AdMob'dan önce izin iste
+    if (Platform.isIOS) {
+      try {
+        final status = await AppTrackingTransparency.trackingAuthorizationStatus;
+        if (status == TrackingStatus.notDetermined) {
+          await Future.delayed(const Duration(milliseconds: 200));
+          await AppTrackingTransparency.requestTrackingAuthorization();
+        }
+      } catch (e) {
+        FirebaseCrashlytics.instance.log('ATT request failed: $e');
+      }
+    }
+
+    // 4) AdMob
     try {
       await MobileAds.instance.initialize();
     } catch (e, s) {
       FirebaseCrashlytics.instance.recordError(e, s, reason: 'MobileAds init');
     }
 
-    // 4) Date formatting
+    // 5) Date formatting
     try {
       await initializeDateFormatting('tr_TR', null);
     } catch (e) {
       FirebaseCrashlytics.instance.log('DateFormatting init failed: $e');
     }
 
-    // 5) FCM background handler
+    // 6) FCM background handler
     try {
       FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     } catch (e) {
       FirebaseCrashlytics.instance.log('FCM background handler failed: $e');
     }
 
-    // 6) Local notifications
+    // 7) Local notifications
     try {
       await _initLocalNotifications();
     } catch (e, s) {
@@ -232,14 +247,24 @@ void main() {
       return;
     }
 
-    // 7) Favorites
+    // 8) Favorites
     try {
       await FavoritesManager.load();
     } catch (e) {
       FirebaseCrashlytics.instance.log('FavoritesManager.load failed: $e');
     }
 
-    // 8) iOS: izin al ve APNS token'ı arka planda hazırla (Android gibi otomatik)
+    // 9) FCM token + kullanıcı tercihlerini Firestore'a kaydet
+    Future(() async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final markets    = (prefs.getStringList('subscribed_markets')    ?? []).toSet();
+        final categories = (prefs.getStringList('subscribed_categories') ?? []).toSet();
+        await saveUserPrefsToFirestore(markets: markets, categories: categories);
+      } catch (_) {}
+    });
+
+    // 10) iOS: izin al ve APNS token'ı arka planda hazırla (Android gibi otomatik)
     if (Platform.isIOS) {
       Future(() async {
         try {
