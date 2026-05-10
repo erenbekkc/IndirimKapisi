@@ -9,8 +9,7 @@ import 'main.dart';
 // ────────────────────────────────────────────────────────────────
 // Bildirim mantığı:
 //  • Her uygulama açılışında kontrol eder
-//  • Son bildirimden en az 2 gün geçmişse bugün 14:00'a bildirim planlar
-//  • (1 gün bildirim, 1 gün boş = 2 günde 1 ritim)
+//  • Son bildirimden en az 1 gün geçmişse bugünkü saate bildirim planlar
 //  • İçerik: takip edilen marketlerdeki + kategorilerdeki AKTİF kampanyaların
 //    market ve kategori adlarını özetleyen sıcak, emoji'li mesaj
 // ────────────────────────────────────────────────────────────────
@@ -30,10 +29,10 @@ class NotificationScheduler {
       final lastSentDate = prefs.getString(_lastSentDateKey) ?? '';
       if (lastSentDate == today) return;
 
-      // Son gönderimden 2 gün geçmedi mi?
+      // Son gönderimden 1 gün geçmedi mi?
       if (lastSentDate.isNotEmpty) {
         final last = DateTime.tryParse(lastSentDate);
-        if (last != null && now.difference(last).inDays < 2) return;
+        if (last != null && now.difference(last).inDays < 1) return;
       }
 
       // ── Kullanıcı abonelikleri ──────────────────────────────
@@ -145,6 +144,11 @@ class NotificationScheduler {
             importance: Importance.high,
             priority: Priority.high,
             icon: '@mipmap/ic_launcher',
+          ),
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,

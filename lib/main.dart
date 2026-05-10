@@ -254,31 +254,39 @@ void main() {
       FirebaseCrashlytics.instance.log('FavoritesManager.load failed: $e');
     }
 
-    // 9) FCM token + kullanıcı tercihlerini Firestore'a kaydet
-    Future(() async {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final markets    = (prefs.getStringList('subscribed_markets')    ?? []).toSet();
-        final categories = (prefs.getStringList('subscribed_categories') ?? []).toSet();
-        await saveUserPrefsToFirestore(markets: markets, categories: categories);
-      } catch (_) {}
-    });
+    // 9) Android: izin + token kaydet + topic
+    if (!Platform.isIOS) {
+      Future(() async {
+        try {
+          await FirebaseMessaging.instance.requestPermission();
+          final prefs      = await SharedPreferences.getInstance();
+          final markets    = (prefs.getStringList('subscribed_markets')    ?? []).toSet();
+          final categories = (prefs.getStringList('subscribed_categories') ?? []).toSet();
+          await saveUserPrefsToFirestore(markets: markets, categories: categories);
+        } catch (_) {}
+        FirebaseMessaging.instance.subscribeToTopic('indirim_radari_all').catchError((_) {});
+      });
+    }
 
-    // 10) iOS: izin al ve APNS token'ı arka planda hazırla (Android gibi otomatik)
+    // 10) iOS: önce APNS token bekle, sonra FCM token kaydet + topic
     if (Platform.isIOS) {
       Future(() async {
         try {
           await FirebaseMessaging.instance.requestPermission();
+          // APNS token hazır olana kadar bekle (maks 30 sn)
           for (int i = 0; i < 30; i++) {
             final apns = await FirebaseMessaging.instance.getAPNSToken();
             if (apns != null) break;
             await Future.delayed(const Duration(seconds: 1));
           }
+          // APNS hazır — FCM token artık geçerli
+          final prefs      = await SharedPreferences.getInstance();
+          final markets    = (prefs.getStringList('subscribed_markets')    ?? []).toSet();
+          final categories = (prefs.getStringList('subscribed_categories') ?? []).toSet();
+          await saveUserPrefsToFirestore(markets: markets, categories: categories);
         } catch (_) {}
         FirebaseMessaging.instance.subscribeToTopic('indirim_radari_all').catchError((_) {});
       });
-    } else {
-      FirebaseMessaging.instance.subscribeToTopic('indirim_radari_all').catchError((_) {});
     }
 
     // App ön planda iken gelen data mesajını da işle
