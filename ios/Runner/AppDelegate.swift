@@ -41,6 +41,12 @@ import FirebaseMessaging
   ) {
     // no-op
   }
+
+  // Uygulama açılınca / öne gelince badge'i sıfırla
+  override func applicationDidBecomeActive(_ application: UIApplication) {
+    application.applicationIconBadgeNumber = 0
+    UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+  }
 }
 
 // FCM token değişince Flutter plugin'e ilet
