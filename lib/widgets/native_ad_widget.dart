@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../ad_helper.dart';
 
 class NativeAdWidget extends StatefulWidget {
@@ -29,6 +30,9 @@ class _NativeAdWidgetState extends State<NativeAdWidget> {
           if (mounted) setState(() => _isLoaded = true);
         },
         onAdFailedToLoad: (ad, error) {
+          FirebaseCrashlytics.instance.log(
+            'NativeAd failed: code=${error.code} domain=${error.domain} message=${error.message}',
+          );
           ad.dispose();
         },
       ),
