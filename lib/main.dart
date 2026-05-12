@@ -11,7 +11,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'firebase_options.dart';
@@ -197,23 +196,14 @@ void main() {
     // Crashlytics artık hazır
     FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
 
-    // 2) Anonymous Auth — Firestore yazmaları için gerekli
-    try {
-      if (FirebaseAuth.instance.currentUser == null) {
-        await FirebaseAuth.instance.signInAnonymously();
-      }
-    } catch (e) {
-      FirebaseCrashlytics.instance.log('Anonymous auth failed: $e');
-    }
-
-    // 3) Analytics
+    // 2) Analytics
     try {
       FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
     } catch (e) {
       FirebaseCrashlytics.instance.log('Analytics init failed: $e');
     }
 
-    // 4) ATT (iOS) — AdMob'dan önce izin iste
+    // 3) ATT (iOS) — AdMob'dan önce izin iste
     if (Platform.isIOS) {
       try {
         final status = await AppTrackingTransparency.trackingAuthorizationStatus;
@@ -226,28 +216,28 @@ void main() {
       }
     }
 
-    // 5) AdMob
+    // 4) AdMob
     try {
       await MobileAds.instance.initialize();
     } catch (e, s) {
       FirebaseCrashlytics.instance.recordError(e, s, reason: 'MobileAds init');
     }
 
-    // 6) Date formatting
+    // 5) Date formatting
     try {
       await initializeDateFormatting('tr_TR', null);
     } catch (e) {
       FirebaseCrashlytics.instance.log('DateFormatting init failed: $e');
     }
 
-    // 7) FCM background handler
+    // 6) FCM background handler
     try {
       FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     } catch (e) {
       FirebaseCrashlytics.instance.log('FCM background handler failed: $e');
     }
 
-    // 8) Local notifications
+    // 7) Local notifications
     try {
       await _initLocalNotifications();
     } catch (e, s) {
@@ -257,14 +247,14 @@ void main() {
       return;
     }
 
-    // 9) Favorites
+    // 8) Favorites
     try {
       await FavoritesManager.load();
     } catch (e) {
       FirebaseCrashlytics.instance.log('FavoritesManager.load failed: $e');
     }
 
-    // 10) Android: izin + token kaydet + topic
+    // 9) Android: izin + token kaydet + topic
     if (!Platform.isIOS) {
       Future(() async {
         try {
@@ -278,7 +268,7 @@ void main() {
       });
     }
 
-    // 11) iOS: önce APNS token bekle, sonra FCM token kaydet + topic
+    // 10) iOS: önce APNS token bekle, sonra FCM token kaydet + topic
     if (Platform.isIOS) {
       Future(() async {
         try {
