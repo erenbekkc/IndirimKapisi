@@ -1,23 +1,42 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../app_logger.dart';
+
+// Cihaza özgü kalıcı kullanıcı ID'si.
+// SharedPreferences'ta saklanır — Firebase Auth gerektirmez,
+// internet olmadan çalışır, uygulama güncellemelerinde korunur.
+Future<String> getOrCreateUserId() async {
+  final prefs = await SharedPreferences.getInstance();
+  var uid = prefs.getString('app_user_id');
+  if (uid == null) {
+    final rng = Random.secure();
+    uid = List.generate(32, (_) => rng.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+    await prefs.setString('app_user_id', uid);
+  }
+  return uid;
+}
 
 Future<void> saveUserPrefsToFirestore({
   required Set<String> markets,
   required Set<String> categories,
 }) async {
   try {
+    final uid   = await getOrCreateUserId();
     final token = await FirebaseMessaging.instance.getToken();
-    if (token == null) return;
-    await FirebaseFirestore.instance.collection('user_prefs').doc(token).set({
+    await FirebaseFirestore.instance.collection('user_prefs').doc(uid).set({
       'token':      token,
       'markets':    markets.toList(),
       'categories': categories.toList(),
+      'platform':   Platform.isIOS ? 'ios' : 'android',
       'updatedAt':  FieldValue.serverTimestamp(),
-    });
-  } catch (_) {}
+    }, SetOptions(merge: true));
+  } catch (e, s) {
+    logError('saveUserPrefsToFirestore', e, s);
+  }
 }
 
 String _normalizeTopicKey(String key) {

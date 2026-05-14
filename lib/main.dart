@@ -11,12 +11,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'firebase_options.dart';
 import 'favorites_manager.dart';
 import 'screens/main_screen.dart';
-import 'screens/settings_screen.dart' show saveUserPrefsToFirestore;
+import 'screens/settings_screen.dart' show saveUserPrefsToFirestore, getOrCreateUserId;
+import 'app_logger.dart';
 
 final FlutterLocalNotificationsPlugin localNotifications = FlutterLocalNotificationsPlugin();
 
@@ -156,6 +158,38 @@ String _generalMessage(int total) {
   return templates[rnd.nextInt(templates.length)];
 }
 
+Future<void> _logAppOpen() async {
+  try {
+    final uid = await getOrCreateUserId();
+    final platform = Platform.isIOS ? 'ios' : 'android';
+    final now = DateTime.now();
+    final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    await FirebaseFirestore.instance.collection('daily_stats').doc(dateStr).set({
+      '${platform}Opens':       FieldValue.increment(1),
+      '${platform}UniqueUsers': FieldValue.arrayUnion([uid]),
+      'date': dateStr,
+    }, SetOptions(merge: true));
+  } catch (e, s) {
+    logError('_logAppOpen', e, s);
+  }
+}
+
+Future<void> _logNotifClick() async {
+  try {
+    final token = await FirebaseMessaging.instance.getToken();
+    if (token == null) return;
+    final platform = Platform.isIOS ? 'ios' : 'android';
+    final now = DateTime.now();
+    final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    await FirebaseFirestore.instance.collection('daily_stats').doc(dateStr).set({
+      '${platform}NotifClicks': FieldValue.increment(1),
+      'date': dateStr,
+    }, SetOptions(merge: true));
+  } catch (e, s) {
+    logError('_logNotifClick', e, s);
+  }
+}
+
 Future<void> _initLocalNotifications() async {
   const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
   const iosSettings = DarwinInitializationSettings(
@@ -165,6 +199,7 @@ Future<void> _initLocalNotifications() async {
   );
   await localNotifications.initialize(
     const InitializationSettings(android: androidSettings, iOS: iosSettings),
+    onDidReceiveNotificationResponse: (_) => _logNotifClick(),
   );
 
   const androidChannel = AndroidNotificationChannel(
@@ -263,7 +298,9 @@ void main() {
           final markets    = (prefs.getStringList('subscribed_markets')    ?? []).toSet();
           final categories = (prefs.getStringList('subscribed_categories') ?? []).toSet();
           await saveUserPrefsToFirestore(markets: markets, categories: categories);
-        } catch (_) {}
+        } catch (e, s) {
+          logError('startup_android_saveUserPrefs', e, s);
+        }
         FirebaseMessaging.instance.subscribeToTopic('indirim_radari_all').catchError((_) {});
       });
     }
@@ -284,7 +321,9 @@ void main() {
           final markets    = (prefs.getStringList('subscribed_markets')    ?? []).toSet();
           final categories = (prefs.getStringList('subscribed_categories') ?? []).toSet();
           await saveUserPrefsToFirestore(markets: markets, categories: categories);
-        } catch (_) {}
+        } catch (e, s) {
+          logError('startup_ios_saveUserPrefs', e, s);
+        }
         FirebaseMessaging.instance.subscribeToTopic('indirim_radari_all').catchError((_) {});
       });
     }
@@ -326,6 +365,13 @@ void main() {
       }
     });
 
+    // Bildirime tıklama — arka planda iken
+    FirebaseMessaging.onMessageOpenedApp.listen((_) => _logNotifClick());
+    // Bildirime tıklama — uygulama kapalıyken
+    FirebaseMessaging.instance.getInitialMessage().then((msg) {
+      if (msg != null) _logNotifClick();
+    });
+
     runApp(const IndirimRadariApp());
   }, (error, stack) {
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
@@ -365,6 +411,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
+    Future(() => _logAppOpen());
     Future.delayed(const Duration(seconds: 1), () {
       if (mounted) {
         Navigator.of(context).pushReplacement(

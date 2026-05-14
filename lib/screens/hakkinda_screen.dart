@@ -74,7 +74,7 @@ class HakkindaScreen extends StatelessWidget {
                 iconColor: const Color(0xFF16A34A),
                 title: 'Uygulama Hakkında',
                 content:
-                    'İndirim Kapısı; Migros, ŞOK, BİM ve A101 marketlerinin indirim ve kampanya fırsatlarını tek çatı altında toplayan yenilikçi, yapay zeka destekli bir indirim ve fırsat takip uygulamasıdır.\n\n'
+                    'İndirim Kapısı; zincir marketlerin indirim ve kampanya fırsatlarını tek çatı altında takip etmeye yarayan bağımsız, yapay zeka destekli bir platform uygulamasıdır.\n\n'
                     'Hangi üründe ne kadar indirim olduğunu, hangi marketin hangi kampanyayı sunduğunu artık tek tek takip etmenize gerek yok. Tüm fırsatlar sizin için düzenlenmiş hâlde, bir dokunuşta önünüzde.',
               ),
 
@@ -145,8 +145,7 @@ class HakkindaScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     const Text(
-                      'İndirim Kapısı uygulaması, bağımsız olarak geliştirilmiş bir kampanya takip platformudur. Uygulama; BİM, A101, Şok, Migros ve diğer market zincirleriyle herhangi bir resmi ortaklık, sponsorluk veya bağlantı içermemektedir.\n\n'
-                      'Uygulamada kullanılan marka isimleri, logolar ve ticari markalar yalnızca tanımlama amacıyla kullanılmış olup ilgili şirketlerin tescilli mülkiyetindedir.\n\n'
+                      'İndirim Kapısı uygulaması, bağımsız olarak geliştirilmiş bir kampanya takip platformudur. Herhangi bir market zinciriyle resmi ortaklık, sponsorluk veya iş birliği bulunmamakta; bu markaları temsil etmemektedir.\n\n'
                       'Kampanya ve indirim bilgileri kamuya açık kaynaklardan derlenmekte olup doğruluk garantisi verilmemektedir. Güncel fiyat ve kampanya bilgileri için ilgili marketin resmi kanallarını ziyaret ediniz.',
                       style: TextStyle(
                         fontSize: 12,

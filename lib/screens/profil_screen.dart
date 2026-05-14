@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'settings_screen.dart' show saveUserPrefsToFirestore;
+import '../app_logger.dart';
 
 String _normalizeTopicKey(String key) {
   const tr = 'şŞıİğĞüÜöÖçÇ';
@@ -118,7 +120,8 @@ class _ProfilScreenState extends State<ProfilScreen> {
           const SnackBar(content: Text('Tüm bildirimler açıldı!'), backgroundColor: Color(0xFF16A34A)),
         );
       }
-    } catch (e) {
+    } catch (e, s) {
+      logError('profil_subscribeAll', e, s);
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
       );
@@ -140,8 +143,10 @@ class _ProfilScreenState extends State<ProfilScreen> {
         _subscribedMarkets.remove(topicKey);
       }
       await prefs.setStringList('subscribed_markets', _subscribedMarkets.toList());
+      saveUserPrefsToFirestore(markets: _subscribedMarkets, categories: _subscribedCategories);
       setState(() {});
-    } catch (e) {
+    } catch (e, s) {
+      logError('profil_toggleMarket', e, s, {'topicKey': topicKey, 'subscribe': subscribe});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Bildirim ayarı değiştirilemedi: $e'), backgroundColor: Colors.red),
@@ -163,8 +168,10 @@ class _ProfilScreenState extends State<ProfilScreen> {
         _subscribedCategories.remove(topicKey);
       }
       await prefs.setStringList('subscribed_categories', _subscribedCategories.toList());
+      saveUserPrefsToFirestore(markets: _subscribedMarkets, categories: _subscribedCategories);
       setState(() {});
-    } catch (e) {
+    } catch (e, s) {
+      logError('profil_toggleCategory', e, s, {'topicKey': topicKey, 'subscribe': subscribe});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Bildirim ayarı değiştirilemedi: $e'), backgroundColor: Colors.red),

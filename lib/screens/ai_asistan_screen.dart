@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import '../favorites_manager.dart';
 import '../widgets/image_lightbox.dart';
+import '../app_logger.dart';
 
 // Mesajlar uygulama açık olduğu sürece korunur
 final List<_ChatMessage> _persistedMessages = [];
@@ -30,7 +31,9 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
     try {
       final doc = await FirebaseFirestore.instance.collection('config').doc('ai').get();
       _apiKey = doc.data()?['apiKey'] as String?;
-    } catch (_) {}
+    } catch (e, s) {
+      logError('ai_loadApiKey', e, s);
+    }
   }
 
   final _priceFmt = NumberFormat('#,##0.00', 'tr_TR');
