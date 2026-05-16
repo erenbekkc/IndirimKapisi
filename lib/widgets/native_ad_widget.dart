@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../ad_helper.dart';
+import '../session_tracker.dart';
 
 class NativeAdWidget extends StatefulWidget {
   const NativeAdWidget({super.key});
@@ -29,6 +30,7 @@ class _NativeAdWidgetState extends State<NativeAdWidget> {
         onAdLoaded: (_) {
           if (mounted) setState(() => _isLoaded = true);
         },
+        onAdImpression: (_) => SessionTracker.instance.incrementAd(),
         onAdFailedToLoad: (ad, error) {
           FirebaseCrashlytics.instance.log(
             'NativeAd failed: code=${error.code} domain=${error.domain} message=${error.message}',

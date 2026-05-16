@@ -19,6 +19,7 @@ import 'favorites_manager.dart';
 import 'screens/main_screen.dart';
 import 'screens/settings_screen.dart' show saveUserPrefsToFirestore, getOrCreateUserId;
 import 'app_logger.dart';
+import 'session_tracker.dart';
 
 final FlutterLocalNotificationsPlugin localNotifications = FlutterLocalNotificationsPlugin();
 
@@ -412,6 +413,7 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     Future(() => _logAppOpen());
+    SessionTracker.instance.startSession();
     Future.delayed(const Duration(seconds: 1), () {
       if (mounted) {
         Navigator.of(context).pushReplacement(
