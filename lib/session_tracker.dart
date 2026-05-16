@@ -15,11 +15,12 @@ class SessionTracker {
   SessionTracker._();
   static final SessionTracker instance = SessionTracker._();
 
-  static const _keyStart   = 'st_session_start_ms';
-  static const _keyAds     = 'st_ads_watched';
-  static const _keyCity    = 'st_city';
-  static const _keyIsFirst = 'st_is_first';
-  static const _keyCityTs  = 'st_city_ts';
+  static const _keyStart    = 'st_session_start_ms';
+  static const _keyEnd      = 'st_session_end_ms';
+  static const _keyAds      = 'st_ads_watched';
+  static const _keyCity     = 'st_city';
+  static const _keyIsFirst  = 'st_is_first';
+  static const _keyCityTs   = 'st_city_ts';
   static const _keyFirstDone = 'st_first_done';
 
   int _adsThisSession = 0;
@@ -59,19 +60,18 @@ class SessionTracker {
 
   // ── Arka plana geçince çağrılır — sadece disk yazımı, Firestore YOK ──────
   void saveAndReset() {
-    // Async OLMAYAN kısım: sadece SharedPreferences'a yaz (mikrosaniye)
     SharedPreferences.getInstance().then((prefs) async {
       final startMs = prefs.getInt(_keyStart) ?? 0;
       if (startMs == 0) return;
-      final durationSecs =
-          ((DateTime.now().millisecondsSinceEpoch - startMs) / 1000).round();
+      final endMs = DateTime.now().millisecondsSinceEpoch;
+      final durationSecs = ((endMs - startMs) / 1000).round();
       if (durationSecs < 5) {
-        await prefs.remove(_keyStart); // çok kısa — temizle
+        await prefs.remove(_keyStart);
         return;
       }
-      // Bitiş zamanını da kaydet ki sonraki açılışta hesaplayabilelim
+      // Bitiş zamanını kaydet — flush sırasında "şu an" yerine bu kullanılır
+      await prefs.setInt(_keyEnd, endMs);
       await prefs.setInt(_keyAds, _adsThisSession);
-      // _keyStart zaten ayarlı — pending olarak bırak, flush açılışta olur
       _adsThisSession = 0;
     }).catchError((_) {});
   }
@@ -81,16 +81,18 @@ class SessionTracker {
     final startMs = prefs.getInt(_keyStart) ?? 0;
     if (startMs == 0) return; // bekleyen yok
 
-    final durationSecs =
-        ((DateTime.now().millisecondsSinceEpoch - startMs) / 1000).round();
+    // Bitiş zamanı kaydedildiyse onu kullan, yoksa şu anı kullan
+    final endMs = prefs.getInt(_keyEnd) ?? DateTime.now().millisecondsSinceEpoch;
+    final durationSecs = ((endMs - startMs) / 1000).round();
     final ads     = prefs.getInt(_keyAds) ?? 0;
     final city    = prefs.getString(_keyCity) ?? 'Bilinmiyor';
     final isFirst = prefs.getBool(_keyIsFirst) ?? false;
     final dateStr = DateFormat('yyyy-MM-dd').format(
         DateTime.fromMillisecondsSinceEpoch(startMs));
 
-    // Bekleyen kaydı temizle (başarılı olsun ya da olmasın, tekrar yazma)
+    // Bekleyen kaydı temizle
     await prefs.remove(_keyStart);
+    await prefs.remove(_keyEnd);
 
     if (durationSecs < 5) return;
 
