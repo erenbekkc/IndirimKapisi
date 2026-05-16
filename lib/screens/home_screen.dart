@@ -457,12 +457,17 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(
               child: ListView.separated(
                 padding: const EdgeInsets.all(12),
-                itemCount: docs.length + (docs.length ~/ 5),
+                itemCount: () {
+                  if (docs.isEmpty) return 0;
+                  final base = docs.length + (docs.length ~/ 5);
+                  return base % 6 == 0 ? base : base + 1;
+                }(),
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (context, i) {
-                  if ((i + 1) % 6 == 0) {
-                    return const NativeAdWidget();
-                  }
+                  final base = docs.length + (docs.length ~/ 5);
+                  final totalCount = base % 6 == 0 ? base : base + 1;
+                  if (i == totalCount - 1 && base % 6 != 0) return const NativeAdWidget();
+                  if ((i + 1) % 6 == 0) return const NativeAdWidget();
                   final adCount = i ~/ 6;
                   final campaignIndex = i - adCount;
                   return _buildCampaignCard(docs[campaignIndex]);

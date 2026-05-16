@@ -292,12 +292,16 @@ class _FavorilerScreenState extends State<FavorilerScreen> {
                                 )
                               : ListView.separated(
                                   padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                                  itemCount: filtered.length + (filtered.length ~/ 5),
+                                  itemCount: () {
+                                    final base = filtered.length + (filtered.length ~/ 5);
+                                    return base % 6 == 0 ? base : base + 1;
+                                  }(),
                                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                                   itemBuilder: (_, i) {
-                                    if ((i + 1) % 6 == 0) {
-                                      return const NativeAdWidget();
-                                    }
+                                    final base = filtered.length + (filtered.length ~/ 5);
+                                    final totalCount = base % 6 == 0 ? base : base + 1;
+                                    if (i == totalCount - 1 && base % 6 != 0) return const NativeAdWidget();
+                                    if ((i + 1) % 6 == 0) return const NativeAdWidget();
                                     final adCount = i ~/ 6;
                                     final idx = i - adCount;
                                     return _buildFavCard(filtered[idx], now, priceFormat);
