@@ -81,29 +81,32 @@ class SessionTracker {
     final startMs = prefs.getInt(_keyStart) ?? 0;
     if (startMs == 0) return; // bekleyen yok
 
-    // Bitiş zamanı kaydedildiyse onu kullan, yoksa şu anı kullan
-    final endMs = prefs.getInt(_keyEnd) ?? DateTime.now().millisecondsSinceEpoch;
-    final durationSecs = ((endMs - startMs) / 1000).round();
-    final ads     = prefs.getInt(_keyAds) ?? 0;
-    final city    = prefs.getString(_keyCity) ?? 'Bilinmiyor';
-    final isFirst = prefs.getBool(_keyIsFirst) ?? false;
-    final dateStr = DateFormat('yyyy-MM-dd').format(
-        DateTime.fromMillisecondsSinceEpoch(startMs));
+    final savedEnd = prefs.getInt(_keyEnd);
 
-    // Bekleyen kaydı temizle
-    await prefs.remove(_keyStart);
-    await prefs.remove(_keyEnd);
+    // _keyEnd kaydedilmemişse (force-quit, iOS arka plan iptali vb.)
+    // DateTime.now() kullanmak süresi şişirir — oturumu at.
+    if (savedEnd == null) {
+      await prefs.remove(_keyStart);
+      return;
+    }
 
-    if (durationSecs < 5) {
+    final durationSecs = ((savedEnd - startMs) / 1000).round();
+
+    // 5 saniyeden kısa veya 60 dakikadan uzun oturumları at.
+    if (durationSecs < 5 || durationSecs > 3600) {
       await prefs.remove(_keyStart);
       await prefs.remove(_keyEnd);
       return;
     }
 
+    final ads     = prefs.getInt(_keyAds) ?? 0;
+    final city    = prefs.getString(_keyCity) ?? 'Bilinmiyor';
+    final isFirst = prefs.getBool(_keyIsFirst) ?? false;
+    final dateStr = DateFormat('yyyy-MM-dd').format(
+        DateTime.fromMillisecondsSinceEpoch(startMs));
     final uid = prefs.getString('app_user_id');
 
-    // Firestore yazımı BAŞARILI olursa key'leri sil.
-    // Hata olursa key'ler kalır → sonraki açılışta tekrar denenir.
+    // Firestore yazımı başarılıysa key'leri sil, hata olursa bırak → retry.
     await FirebaseFirestore.instance.collection('user-stats').add({
       'platform':               Platform.isIOS ? 'ios' : 'android',
       'isFirstOpen':            isFirst,
