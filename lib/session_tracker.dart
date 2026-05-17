@@ -8,21 +8,27 @@ import 'app_logger.dart';
 
 /// Singleton — oturum süresini ve reklam sayısını takip eder.
 ///
-/// Strateji: arka plana geçince veriyi sadece SharedPreferences'a yazar
-/// (disk yazımı — hızlı, asla kesilmez). Uygulama bir sonraki açılışında
-/// bekleyen veriyi Firestore'a gönderir (uygulama aktifken → güvenli).
+/// Strateji:
+///  • startSession() → SharedPreferences instance'ını cache'ler, önceki
+///    oturumu Firestore'a gönderir, yeni oturumu başlatır.
+///  • saveAndReset() → TAMAMEN SENKRON (await yok). Cache'li prefs üzerinden
+///    anlık yazar; iOS arka plan kısıtlamalarından etkilenmez.
+///  • _flushPending() → _keyEnd kaydedilmediyse oturumu atar (şişirilmiş
+///    süre yazılmasını önler). Firestore yazımı başarısızsa key'ler korunur
+///    ve bir sonraki açılışta tekrar denenir.
 class SessionTracker {
   SessionTracker._();
   static final SessionTracker instance = SessionTracker._();
 
-  static const _keyStart    = 'st_session_start_ms';
-  static const _keyEnd      = 'st_session_end_ms';
-  static const _keyAds      = 'st_ads_watched';
-  static const _keyCity     = 'st_city';
-  static const _keyIsFirst  = 'st_is_first';
-  static const _keyCityTs   = 'st_city_ts';
+  static const _keyStart     = 'st_session_start_ms';
+  static const _keyEnd       = 'st_session_end_ms';
+  static const _keyAds       = 'st_ads_watched';
+  static const _keyCity      = 'st_city';
+  static const _keyIsFirst   = 'st_is_first';
+  static const _keyCityTs    = 'st_city_ts';
   static const _keyFirstDone = 'st_first_done';
 
+  SharedPreferences? _prefs; // getInstance() sonrası cache'lenir
   int _adsThisSession = 0;
 
   // ── Uygulama açılınca çağrılır (soğuk başlatma + resume) ─────────────────
@@ -30,18 +36,19 @@ class SessionTracker {
     Future(() async {
       try {
         final prefs = await SharedPreferences.getInstance();
+        _prefs = prefs; // Artık saveAndReset() ve incrementAd() senkron çalışabilir
 
         // 1) Önceki oturumun bekleyen verisi varsa Firestore'a gönder
         await _flushPending(prefs);
 
-        // 2) Şehri arka planda tazele
+        // 2) Şehri arka planda tazele (24 saatte bir)
         await _refreshCity(prefs);
 
-        // 3) Yeni oturumu başlat — başlangıç zamanını diske kaydet
+        // 3) Yeni oturumu başlat
         final isFirst = prefs.getBool(_keyFirstDone) != true;
-        await prefs.setInt(_keyStart, DateTime.now().millisecondsSinceEpoch);
-        await prefs.setInt(_keyAds, 0);
-        await prefs.setBool(_keyIsFirst, isFirst);
+        prefs.setInt(_keyStart, DateTime.now().millisecondsSinceEpoch);
+        prefs.setInt(_keyAds, 0);
+        prefs.setBool(_keyIsFirst, isFirst);
         _adsThisSession = 0;
       } catch (e, s) {
         logError('SessionTracker.startSession', e, s);
@@ -52,28 +59,30 @@ class SessionTracker {
   // ── Reklam gösteriminde çağrılır ─────────────────────────────────────────
   void incrementAd() {
     _adsThisSession++;
-    // SharedPreferences'a da yaz ki uygulama kill olursa kaybolmasın
-    SharedPreferences.getInstance()
-        .then((p) => p.setInt(_keyAds, _adsThisSession))
-        .catchError((_) {});
+    _prefs?.setInt(_keyAds, _adsThisSession); // Cache'li — await gereksiz
   }
 
-  // ── Arka plana geçince çağrılır — sadece disk yazımı, Firestore YOK ──────
+  // ── Arka plana geçince çağrılır — TAMAMEN SENKRON, iOS safe ──────────────
   void saveAndReset() {
-    SharedPreferences.getInstance().then((prefs) async {
-      final startMs = prefs.getInt(_keyStart) ?? 0;
-      if (startMs == 0) return;
-      final endMs = DateTime.now().millisecondsSinceEpoch;
-      final durationSecs = ((endMs - startMs) / 1000).round();
-      if (durationSecs < 5) {
-        await prefs.remove(_keyStart);
-        return;
-      }
-      // Bitiş zamanını kaydet — flush sırasında "şu an" yerine bu kullanılır
-      await prefs.setInt(_keyEnd, endMs);
-      await prefs.setInt(_keyAds, _adsThisSession);
-      _adsThisSession = 0;
-    }).catchError((_) {});
+    final prefs = _prefs;
+    if (prefs == null) return; // startSession henüz tamamlanmadı
+
+    final startMs = prefs.getInt(_keyStart) ?? 0;
+    if (startMs == 0) return;
+
+    final endMs = DateTime.now().millisecondsSinceEpoch;
+    final durationSecs = ((endMs - startMs) / 1000).round();
+
+    if (durationSecs < 5) {
+      prefs.remove(_keyStart);
+      return;
+    }
+
+    // Senkron setInt — SharedPreferences bellek içi cache'e anında yazar,
+    // disk flush'u OS tarafından yönetilir (NSUserDefaults / SharedPreferences).
+    prefs.setInt(_keyEnd, endMs);
+    prefs.setInt(_keyAds, _adsThisSession);
+    _adsThisSession = 0;
   }
 
   // ── Bekleyen oturumu Firestore'a gönderir (uygulama aktifken) ────────────
@@ -83,8 +92,8 @@ class SessionTracker {
 
     final savedEnd = prefs.getInt(_keyEnd);
 
-    // _keyEnd kaydedilmemişse (force-quit, iOS arka plan iptali vb.)
-    // DateTime.now() kullanmak süresi şişirir — oturumu at.
+    // _keyEnd kaydedilmemişse (force-quit vb.) oturumu at.
+    // DateTime.now() fallback kullanmak süresi şişiriyordu.
     if (savedEnd == null) {
       await prefs.remove(_keyStart);
       return;
@@ -121,7 +130,6 @@ class SessionTracker {
     await prefs.remove(_keyStart);
     await prefs.remove(_keyEnd);
 
-    // İlk açılış başarıyla kaydedildi
     if (isFirst) await prefs.setBool(_keyFirstDone, true);
   }
 
@@ -138,8 +146,8 @@ class SessionTracker {
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final city = (data['city'] as String?) ?? 'Bilinmiyor';
-        await prefs.setString(_keyCity, city);
-        await prefs.setInt(_keyCityTs, now);
+        prefs.setString(_keyCity, city);
+        prefs.setInt(_keyCityTs, now);
       }
     } catch (_) {}
   }
