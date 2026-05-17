@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../favorites_manager.dart';
 import '../widgets/native_ad_widget.dart';
+import '../widgets/smart_title_text.dart';
 import '../widgets/image_lightbox.dart';
 
 enum SonFirsatFilter { tumu, bugun, yarin, yuzotuzArti }
@@ -287,8 +288,10 @@ class _AlarmlarScreenState extends State<AlarmlarScreen> {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(data['product'] ?? data['title'] ?? '',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  SmartTitleText(
+                    data['product'] ?? data['title'] ?? '',
+                    fontSize: 14,
+                  ),
                   const SizedBox(height: 4),
                   _buildPriceSection(data, fmt),
                   const SizedBox(height: 4),

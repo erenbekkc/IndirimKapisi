@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../favorites_manager.dart';
 import '../widgets/image_lightbox.dart';
 import '../widgets/native_ad_widget.dart';
+import '../widgets/smart_title_text.dart';
 
 enum FavFilter { tumu, aktif, yakinda }
 
@@ -476,9 +477,9 @@ class _FavorilerScreenState extends State<FavorilerScreen> {
                     ],
                   ),
                   const SizedBox(height: 2),
-                  Text(
+                  SmartTitleText(
                     data['product'] ?? data['title'] ?? '',
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                    fontSize: 14,
                   ),
                   const SizedBox(height: 4),
                   _buildPriceSection(data, fmt),

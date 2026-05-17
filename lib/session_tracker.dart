@@ -94,10 +94,16 @@ class SessionTracker {
     await prefs.remove(_keyStart);
     await prefs.remove(_keyEnd);
 
-    if (durationSecs < 5) return;
+    if (durationSecs < 5) {
+      await prefs.remove(_keyStart);
+      await prefs.remove(_keyEnd);
+      return;
+    }
 
     final uid = prefs.getString('app_user_id');
 
+    // Firestore yazımı BAŞARILI olursa key'leri sil.
+    // Hata olursa key'ler kalır → sonraki açılışta tekrar denenir.
     await FirebaseFirestore.instance.collection('user-stats').add({
       'platform':               Platform.isIOS ? 'ios' : 'android',
       'isFirstOpen':            isFirst,
@@ -108,6 +114,9 @@ class SessionTracker {
       if (uid != null) 'uid':  uid,
       'createdAt':              FieldValue.serverTimestamp(),
     });
+
+    await prefs.remove(_keyStart);
+    await prefs.remove(_keyEnd);
 
     // İlk açılış başarıyla kaydedildi
     if (isFirst) await prefs.setBool(_keyFirstDone, true);

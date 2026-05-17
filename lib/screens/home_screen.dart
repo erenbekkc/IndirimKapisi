@@ -9,6 +9,7 @@ import '../favorites_manager.dart';
 import '../notification_scheduler.dart';
 import '../widgets/image_lightbox.dart';
 import '../widgets/native_ad_widget.dart';
+import '../widgets/smart_title_text.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -518,13 +519,10 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-            Text(
+            SmartTitleText(
               data['product'] ?? data['title'] ?? '',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: isExpired ? Colors.grey : null,
-              ),
+              fontSize: 16,
+              color: isExpired ? Colors.grey : null,
             ),
             if (data['campaignType'] == 'priceDiscount') ...[
               const SizedBox(height: 6),

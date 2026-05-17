@@ -107,29 +107,69 @@ String _joinMax2(List<String> names) {
   return '${names[0]} ve ${names[1]}';
 }
 
+/// Türkçe ek uyumu: ismin son sesli harfine ve son harfin sertliğine göre
+/// '-da/-de/-ta/-te' lokasyon ekini döner.
+/// Birden fazla kelimede (ör. "BİM ve Migros") son kelimeye bakılır.
+String _locativeSuffix(String name) {
+  final lastWord = name.split(' ').last;
+  final lastChar = lastWord.isNotEmpty ? lastWord[lastWord.length - 1] : '';
+
+  // Rakamla bitiyorsa Türkçe okunuşuna göre ek
+  const digitSuffixes = {
+    '0': 'da',  // sıfır → ı
+    '1': 'de',  // bir   → i
+    '2': 'de',  // iki   → i
+    '3': 'te',  // üç    → ü, sert
+    '4': 'te',  // dört  → ö, sert
+    '5': 'te',  // beş   → e, sert
+    '6': 'ta',  // altı  → ı
+    '7': 'de',  // yedi  → i
+    '8': 'de',  // sekiz → i
+    '9': 'da',  // dokuz → u
+  };
+  if (digitSuffixes.containsKey(lastChar)) return digitSuffixes[lastChar]!;
+
+  const backVowels  = {'a', 'ı', 'o', 'u', 'A', 'I', 'O', 'U'};
+  const frontVowels = {'e', 'i', 'ö', 'ü', 'E', 'İ', 'Ö', 'Ü'};
+  const voiceless   = {'ç', 'f', 'h', 'k', 'p', 's', 'ş', 't',
+                        'Ç', 'F', 'H', 'K', 'P', 'S', 'Ş', 'T'};
+
+  bool isBack = true;
+  for (int i = lastWord.length - 1; i >= 0; i--) {
+    final ch = lastWord[i];
+    if (backVowels.contains(ch))  { isBack = true;  break; }
+    if (frontVowels.contains(ch)) { isBack = false; break; }
+  }
+
+  final isVoiceless = voiceless.contains(lastChar);
+  if (isBack) return isVoiceless ? 'ta' : 'da';
+  return isVoiceless ? 'te' : 'de';
+}
+
 String _personalMessage(String markets, String cats) {
-  final rnd = Random();
+  final rnd  = Random();
   final hasMkt = markets.isNotEmpty;
   final hasCat = cats.isNotEmpty;
+  final mSuf = _locativeSuffix(markets); // ek uyumu: da/de/ta/te
 
   if (hasMkt && hasCat) {
     final templates = [
-      '🔥 $markets\'da $cats indirimleri devam ediyor — kaçırma! 🛒',
-      '💰 $markets\'da $cats kampanyaları sürüyor, hemen bak! 🛍️',
-      '🎉 $markets\'da $cats fırsatları seni bekliyor! Bir göz at!',
-      '✨ $markets\'daki $cats indirimlerini gördün mü? 🎯',
-      '🤑 $markets\'da $cats kampanyaları aktif — güzel tasarruf fırsatı!',
-      '😍 $markets\'da $cats kampanyaları var, sepetini hazırla! 🛒',
+      '🔥 $markets\'$mSuf $cats indirimleri devam ediyor — kaçırma! 🛒',
+      '💰 $markets\'$mSuf $cats kampanyaları sürüyor, hemen bak! 🛍️',
+      '🎉 $markets\'$mSuf $cats fırsatları seni bekliyor! Bir göz at!',
+      '✨ $markets\'${mSuf}ki $cats indirimlerini gördün mü? 🎯',
+      '🤑 $markets\'$mSuf $cats kampanyaları aktif — güzel tasarruf fırsatı!',
+      '😍 $markets\'$mSuf $cats kampanyaları var, sepetini hazırla! 🛒',
     ];
     return templates[rnd.nextInt(templates.length)];
   } else if (hasMkt) {
     final templates = [
-      '🔥 $markets\'da indirimler devam ediyor — kaçırma! 🛒',
+      '🔥 $markets\'$mSuf indirimler devam ediyor — kaçırma! 🛒',
       '💰 $markets kampanyaları sürüyor, hemen bak! 🛍️',
-      '🎉 $markets\'da harika fırsatlar var, sepetini hazırla!',
-      '✨ $markets\'daki kampanyaları gördün mü? Hemen bak! 🎯',
-      '🤑 $markets\'da güzel indirimler — cebini koru! 💪',
-      '😍 $markets\'da kampanyalar seni bekliyor, bir göz at! 🎁',
+      '🎉 $markets\'$mSuf harika fırsatlar var, sepetini hazırla!',
+      '✨ $markets\'${mSuf}ki kampanyaları gördün mü? Hemen bak! 🎯',
+      '🤑 $markets\'$mSuf güzel indirimler — cebini koru! 💪',
+      '😍 $markets\'$mSuf kampanyalar seni bekliyor, bir göz at! 🎁',
     ];
     return templates[rnd.nextInt(templates.length)];
   } else {
