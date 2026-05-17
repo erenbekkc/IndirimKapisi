@@ -25,6 +25,11 @@ class SmartTitleText extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, constraints) {
       final width = constraints.maxWidth;
+      // Sonsuz genişlikte ölçüm yapılamaz — doğrudan normal render.
+      if (width.isInfinite) {
+        return Text(text,
+            style: TextStyle(fontSize: fontSize, fontWeight: fontWeight, color: color));
+      }
       double fs = fontSize;
 
       while (fs >= minFontSize) {
