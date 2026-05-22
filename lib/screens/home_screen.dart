@@ -6,7 +6,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'ai_asistan_screen.dart';
 import 'package:intl/intl.dart';
 import '../favorites_manager.dart';
-import '../notification_scheduler.dart';
 import '../widgets/image_lightbox.dart';
 import '../widgets/banner_ad_widget.dart';
 import '../widgets/native_ad_widget.dart';
@@ -52,8 +51,6 @@ class _HomeScreenState extends State<HomeScreen> {
       await FirebaseMessaging.instance.requestPermission();
       await FirebaseMessaging.instance.subscribeToTopic('indirim_radari_all');
     }
-    // Yerel bildirim yedek olarak her iki platformda da planla
-    NotificationScheduler.scheduleIfNeeded().catchError((_) {});
   }
 
   Future<void> _loadCategoryIcons() async {
