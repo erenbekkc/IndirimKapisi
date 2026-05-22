@@ -807,7 +807,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         final isFav = favIds.contains(doc.id);
                         return _FavoriteButton(
                           isFav: isFav,
-                          onTap: () => FavoritesManager.toggle(doc.id),
+                          onTap: () => FavoritesManager.toggle(doc.id, campaignData: data),
                         );
                       },
                     ),

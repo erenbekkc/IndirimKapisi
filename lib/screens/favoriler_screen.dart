@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../favorites_manager.dart';
+import '../favourite_logger.dart';
 import '../widgets/image_lightbox.dart';
 import '../widgets/native_ad_widget.dart';
 import '../widgets/smart_title_text.dart';
@@ -26,6 +27,7 @@ class _FavorilerScreenState extends State<FavorilerScreen> {
   void initState() {
     super.initState();
     _loadIcons();
+    FavouriteLogger.updateExpired();
   }
 
   Future<void> _loadIcons() async {
@@ -504,7 +506,7 @@ class _FavorilerScreenState extends State<FavorilerScreen> {
                   ),
                 const SizedBox(height: 8),
                 GestureDetector(
-                  onTap: () => FavoritesManager.toggle(doc.id),
+                  onTap: () => FavoritesManager.toggle(doc.id, campaignData: data),
                   child: Container(
                     width: 28,
                     height: 28,

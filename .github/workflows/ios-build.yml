@@ -71,6 +71,7 @@ jobs:
 
       - name: Flutter pub get + iOS build (pods Flutter tarafından kurulur)
         run: |
+          flutter config --no-enable-swift-package-manager
           flutter pub get
           flutter build ios --release --no-codesign
 

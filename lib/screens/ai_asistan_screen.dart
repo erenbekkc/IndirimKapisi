@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
@@ -6,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../favorites_manager.dart';
 import '../widgets/image_lightbox.dart';
 import '../app_logger.dart';
+import 'settings_screen.dart' show getOrCreateUserId;
 
 // Mesajlar uygulama açık olduğu sürece korunur
 final List<_ChatMessage> _persistedMessages = [];
@@ -279,6 +282,17 @@ $context''',
           isUser: false,
           matchedCampaigns: matched,
         )));
+
+        // Diyaloğu ai-logs'a kaydet
+        unawaited(getOrCreateUserId().then((uid) {
+          FirebaseFirestore.instance.collection('ai-logs').add({
+            'uid': uid,
+            'question': q,
+            'answer': reply,
+            'platform': Platform.isIOS ? 'ios' : 'android',
+            'askedAt': FieldValue.serverTimestamp(),
+          });
+        }));
       } else {
         String errorDetail = '';
         try {
