@@ -19,6 +19,7 @@ import 'favorites_manager.dart';
 import 'screens/main_screen.dart';
 import 'screens/settings_screen.dart' show saveUserPrefsToFirestore, getOrCreateUserId;
 import 'app_logger.dart';
+import 'notification_logger.dart';
 import 'session_tracker.dart';
 
 final FlutterLocalNotificationsPlugin localNotifications = FlutterLocalNotificationsPlugin();
@@ -44,6 +45,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   final body = await _buildPersonalizedBody(message.data);
 
+  final uid   = await getOrCreateUserId();
+  final docId = await NotificationLogger.logSent(
+    uid: uid, message: body, source: 'fcm_background',
+  );
+
   await plugin.show(
     777,
     '🛒 İndirim Kapısı',
@@ -58,6 +64,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       ),
       iOS: DarwinNotificationDetails(),
     ),
+    payload: docId,
   );
 }
 
@@ -240,7 +247,10 @@ Future<void> _initLocalNotifications() async {
   );
   await localNotifications.initialize(
     const InitializationSettings(android: androidSettings, iOS: iosSettings),
-    onDidReceiveNotificationResponse: (_) => _logNotifClick(),
+    onDidReceiveNotificationResponse: (response) {
+      _logNotifClick();
+      NotificationLogger.markClicked(response.payload);
+    },
   );
 
   const androidChannel = AndroidNotificationChannel(
@@ -372,7 +382,11 @@ void main() {
     // App ön planda iken gelen data mesajını da işle
     FirebaseMessaging.onMessage.listen((message) async {
       if (message.data['type'] == 'campaign_notif') {
-        final body = await _buildPersonalizedBody(message.data);
+        final body  = await _buildPersonalizedBody(message.data);
+        final uid   = await getOrCreateUserId();
+        final docId = await NotificationLogger.logSent(
+          uid: uid, message: body, source: 'fcm_foreground',
+        );
         localNotifications.show(
           777,
           '🛒 İndirim Kapısı',
@@ -386,9 +400,16 @@ void main() {
             ),
             iOS: DarwinNotificationDetails(),
           ),
+          payload: docId,
         );
       } else if (message.notification != null) {
-        final n = message.notification!;
+        final n     = message.notification!;
+        final uid   = await getOrCreateUserId();
+        final docId = await NotificationLogger.logSent(
+          uid: uid,
+          message: n.body ?? n.title ?? '',
+          source: 'fcm_notification',
+        );
         localNotifications.show(
           n.hashCode,
           n.title,
@@ -402,6 +423,7 @@ void main() {
             ),
             iOS: DarwinNotificationDetails(),
           ),
+          payload: docId,
         );
       }
     });

@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tzData;
 import 'main.dart';
+import 'notification_logger.dart';
+import 'screens/settings_screen.dart' show getOrCreateUserId;
 
 // ────────────────────────────────────────────────────────────────
 // Bildirim mantığı:
@@ -122,6 +124,12 @@ class NotificationScheduler {
 
       final body = _buildMessage(marketNames, categoryNames);
 
+      // ── Firestore'a gönderim kaydı yaz ─────────────────────
+      final uid   = await getOrCreateUserId();
+      final docId = await NotificationLogger.logSent(
+        uid: uid, message: body, source: 'scheduled',
+      );
+
       // ── 14:00'a planla ─────────────────────────────────────
       tzData.initializeTimeZones();
       final istanbul = tz.getLocation('Europe/Istanbul');
@@ -154,6 +162,7 @@ class NotificationScheduler {
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
+        payload: docId,
       );
 
       // Bugünü kaydet

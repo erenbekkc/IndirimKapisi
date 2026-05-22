@@ -8,10 +8,15 @@ import 'package:intl/intl.dart';
 import '../favorites_manager.dart';
 import '../notification_scheduler.dart';
 import '../widgets/image_lightbox.dart';
+import '../widgets/banner_ad_widget.dart';
 import '../widgets/native_ad_widget.dart';
 import '../widgets/smart_title_text.dart';
 
 class HomeScreen extends StatefulWidget {
+  static final searchBarKey    = GlobalKey();
+  static final campaignListKey = GlobalKey();
+  static final filterBarKey    = GlobalKey();
+
   const HomeScreen({super.key});
 
   @override
@@ -99,10 +104,22 @@ class _HomeScreenState extends State<HomeScreen> {
           top: false,
           child: Column(
             children: [
+              _buildTopBanner(context),
               _buildSearchBar(),
-              _buildMarketChips(),
-              _buildCategoryChips(),
-              Expanded(child: _buildCampaignList()),
+              Column(
+                key: HomeScreen.filterBarKey,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildMarketChips(),
+                  _buildCategoryChips(),
+                ],
+              ),
+              Expanded(
+                child: Container(
+                  key: HomeScreen.campaignListKey,
+                  child: _buildCampaignList(),
+                ),
+              ),
             ],
           ),
         ),
@@ -110,10 +127,21 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildTopBanner(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top;
     return Container(
       color: const Color(0xFFF0FDF4),
-      padding: const EdgeInsets.fromLTRB(12, 48, 12, 10),
+      padding: EdgeInsets.only(top: topPadding),
+      alignment: Alignment.center,
+      child: const BannerAdWidget(),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      key: HomeScreen.searchBarKey,
+      color: const Color(0xFFF0FDF4),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
       child: Row(
         children: [
           ClipOval(
@@ -511,7 +539,7 @@ class _HomeScreenState extends State<HomeScreen> {
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -521,11 +549,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
             SmartTitleText(
               data['product'] ?? data['title'] ?? '',
-              fontSize: 16,
+              fontSize: 14,
               color: isExpired ? Colors.grey : null,
             ),
             if (data['campaignType'] == 'priceDiscount') ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 5),
               Builder(builder: (_) {
                 final oldP = (data['oldPrice'] as num?)?.toDouble() ?? 0;
                 final newP = (data['newPrice'] as num?)?.toDouble() ?? 0;
@@ -538,7 +566,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Text(
                           '${priceFormat.format(oldP)} TL',
                           style: const TextStyle(
-                            fontSize: 15,
+                            fontSize: 13,
                             color: Colors.grey,
                             decoration: TextDecoration.lineThrough,
                           ),
@@ -547,7 +575,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Text(
                           '${priceFormat.format(newP)} TL',
                           style: const TextStyle(
-                            fontSize: 15,
+                            fontSize: 13,
                             color: Colors.deepOrange,
                             fontWeight: FontWeight.bold,
                           ),
@@ -555,7 +583,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                     if (!isExpired) ...[
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 5),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
@@ -565,7 +593,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Text(
                           '🔥 %$pct indirim',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             color: Colors.deepOrange,
                             fontWeight: FontWeight.w600,
                           ),
@@ -577,7 +605,7 @@ class _HomeScreenState extends State<HomeScreen> {
               }),
             ],
             if (data['campaignType'] == 'buyOneGetOne') ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 5),
               Builder(builder: (_) {
                 final price = (data['productPrice'] as num?)?.toDouble() ?? 0;
                 final fullTotal = price * 2;
@@ -593,22 +621,22 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: const Text(
                         '🔥 1 alana 1 bedava',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11,
                           color: Colors.deepOrange,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
                     if (price > 0) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 5),
                     Row(
                       children: [
                         const Text('2 Ürün: ',
-                            style: TextStyle(fontSize: 15, color: Colors.black87, fontWeight: FontWeight.w500)),
+                            style: TextStyle(fontSize: 13, color: Colors.black87, fontWeight: FontWeight.w500)),
                         Text(
                           '${priceFormat.format(fullTotal)} TL',
                           style: const TextStyle(
-                            fontSize: 15,
+                            fontSize: 13,
                             color: Colors.grey,
                             decoration: TextDecoration.lineThrough,
                           ),
@@ -617,7 +645,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Text(
                           '${priceFormat.format(price)} TL',
                           style: const TextStyle(
-                            fontSize: 15,
+                            fontSize: 13,
                             color: Colors.deepOrange,
                             fontWeight: FontWeight.bold,
                           ),
@@ -630,14 +658,13 @@ class _HomeScreenState extends State<HomeScreen> {
               }),
             ],
             if (data['campaignType'] == 'secondDiscount') ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 5),
               Builder(builder: (_) {
                 final rate = (data['discountRate'] as num?)?.toDouble() ?? 0;
                 final price = (data['productPrice'] as num?)?.toDouble() ?? 0;
                 if (price > 0 && rate > 0) {
                   final fullTotal = price * 2;
                   final discountedTotal = price + price * (1 - rate / 100);
-                  final savings = fullTotal - discountedTotal;
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -650,21 +677,21 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Text(
                           '🔥 1 alana 2. %${rate.toInt()} indirimli',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             color: Colors.deepOrange,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 5),
                       Row(
                         children: [
                           const Text('2 Ürün: ',
-                              style: TextStyle(fontSize: 15, color: Colors.black87, fontWeight: FontWeight.w500)),
+                              style: TextStyle(fontSize: 13, color: Colors.black87, fontWeight: FontWeight.w500)),
                           Text(
                             '${priceFormat.format(fullTotal)} TL',
                             style: const TextStyle(
-                              fontSize: 15,
+                              fontSize: 13,
                               color: Colors.grey,
                               decoration: TextDecoration.lineThrough,
                             ),
@@ -673,7 +700,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           Text(
                             '${priceFormat.format(discountedTotal)} TL',
                             style: const TextStyle(
-                              fontSize: 15,
+                              fontSize: 13,
                               color: Colors.deepOrange,
                               fontWeight: FontWeight.bold,
                             ),
@@ -685,19 +712,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
                 return Text(
                   '2. üründe %${rate.toInt()} indirim',
-                  style: const TextStyle(fontSize: 13, color: Colors.deepOrange, fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontSize: 12, color: Colors.deepOrange, fontWeight: FontWeight.w600),
                 );
               }),
             ],
             if ((data['description'] as String?)?.isNotEmpty == true) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 7),
               Text(
                 data['description'],
                 style: TextStyle(
-                    color: isExpired ? Colors.grey : Colors.grey.shade700, fontSize: 14),
+                    color: isExpired ? Colors.grey : Colors.grey.shade700, fontSize: 13),
               ),
             ],
-            const SizedBox(height: 12),
+            const SizedBox(height: 11),
             Row(
               children: [
                 _buildMarketChipCard(
@@ -712,7 +739,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
             if (startDate != null && endDate != null) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 7),
               Builder(builder: (_) {
                 final today = DateTime(now.year, now.month, now.day);
                 final endDay = DateTime(endDate.year, endDate.month, endDate.day);
@@ -722,7 +749,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Icon(Icons.hourglass_bottom, size: 14, color: Colors.red),
                       SizedBox(width: 4),
-                      Text('Bugün son', style: TextStyle(fontSize: 13, color: Colors.red, fontWeight: FontWeight.w600)),
+                      Text('Bugün son', style: TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.w600)),
                     ],
                   );
                 } else if (!isExpired && diff == 1) {
@@ -730,7 +757,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Icon(Icons.access_time, size: 14, color: Colors.orange.shade700),
                       const SizedBox(width: 4),
-                      Text('Yarın bitiyor', style: TextStyle(fontSize: 13, color: Colors.orange.shade700, fontWeight: FontWeight.w600)),
+                      Text('Yarın bitiyor', style: TextStyle(fontSize: 12, color: Colors.orange.shade700, fontWeight: FontWeight.w600)),
                     ],
                   );
                 } else {
@@ -741,7 +768,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text(
                         '${dateFormat.format(startDate)} - ${dateFormat.format(endDate)}',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           color: isExpired ? Colors.grey : const Color(0xFF16A34A),
                           fontWeight: FontWeight.w500,
                         ),
@@ -754,7 +781,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 11),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -770,7 +797,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Text(
                         badgeText,
                         style: TextStyle(
-                            color: badgeColor.withOpacity(0.75), fontSize: 11, fontWeight: FontWeight.w600),
+                            color: badgeColor.withOpacity(0.75), fontSize: 10, fontWeight: FontWeight.w600),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -787,7 +814,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 if (imageUrl != null && imageUrl.isNotEmpty) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 7),
                   GestureDetector(
                     onTap: () => showImageLightbox(context, imageUrl, 'home_${doc.id}'),
                     child: Hero(
@@ -796,14 +823,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         borderRadius: BorderRadius.circular(8),
                         child: Image.network(
                           imageUrl,
-                          width: 98,
-                          height: 98,
+                          width: 88,
+                          height: 88,
                           fit: BoxFit.cover,
                           loadingBuilder: (_, child, progress) => progress == null
                               ? child
                               : const SizedBox(
-                                  width: 98,
-                                  height: 98,
+                                  width: 88,
+                                  height: 88,
                                   child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
                                 ),
                           errorBuilder: (_, __, ___) => const SizedBox.shrink(),
@@ -939,17 +966,21 @@ class _FavoriteButtonState extends State<_FavoriteButton>
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: widget.onTap,
-      child: AnimatedBuilder(
-        animation: _scale,
-        builder: (_, __) => Transform.scale(
-          scale: _scale.value,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: Icon(
-              widget.isFav ? Icons.favorite : Icons.favorite_border,
-              key: ValueKey(widget.isFav),
-              size: 22,
-              color: widget.isFav ? Colors.red.shade400 : Colors.grey.shade300,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: AnimatedBuilder(
+          animation: _scale,
+          builder: (_, __) => Transform.scale(
+            scale: _scale.value,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Icon(
+                widget.isFav ? Icons.favorite : Icons.favorite_border,
+                key: ValueKey(widget.isFav),
+                size: 26,
+                color: widget.isFav ? Colors.red.shade400 : Colors.grey.shade300,
+              ),
             ),
           ),
         ),
