@@ -223,6 +223,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       }
 
       final context = await _fetchCampaignContext();
+      final todayStr = DateFormat('d MMMM yyyy', 'tr_TR').format(DateTime.now());
 
       final resp = await http.post(
         Uri.parse('https://api.anthropic.com/v1/messages'),
@@ -235,6 +236,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
           'model': 'claude-haiku-4-5-20251001',
           'max_tokens': 2048,
           'system': '''Sen İndirim Kapısı uygulamasının alışveriş asistanısın.
+Bugünün tarihi: $todayStr. Tarih sorarlarsa veya "bugün biten" gibi sorgularda bu tarihi kullan.
 Türkiye\'deki market kampanyaları hakkında yardım ediyorsun.
 Kısa, net ve samimi cevaplar ver. Türkçe eş anlamlı kelimeleri anla (tavuk=piliç=kanat=but=göğüs=baget, deterjan=çamaşır=temizlik, vb.).
 TL cinsinden tasarruf hesapları yap, bütçeye göre öneriler sun.
