@@ -223,7 +223,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       }
 
       final context = await _fetchCampaignContext();
-      final todayStr = DateFormat('d MMMM yyyy', 'tr_TR').format(DateTime.now());
+      final todayStr = DateFormat('d MMMM', 'tr_TR').format(DateTime.now());
 
       final resp = await http.post(
         Uri.parse('https://api.anthropic.com/v1/messages'),
