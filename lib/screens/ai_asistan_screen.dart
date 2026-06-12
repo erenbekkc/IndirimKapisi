@@ -92,51 +92,81 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         .orderBy('endDate')
         .get();
 
-    final active = snap.docs.where((d) {
+    final active = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+    final upcoming = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+
+    for (final d in snap.docs) {
       final data = d.data();
       final endDate = (data['endDate'] as Timestamp?)?.toDate();
       final startDate = (data['startDate'] as Timestamp?)?.toDate();
-      if (endDate == null) return false;
+      if (endDate == null) continue;
       final endDay = DateTime(endDate.year, endDate.month, endDate.day);
-      if (endDay.isBefore(today)) return false;
-      return startDate == null || !startDate.isAfter(now);
-    }).take(200).toList();
+      if (endDay.isBefore(today)) continue;
+      if (startDate != null && startDate.isAfter(now)) {
+        upcoming.add(d);
+      } else {
+        active.add(d);
+      }
+    }
 
-    _activeCampaigns = active.map((d) {
-      final data = d.data();
-      final marketId = data['marketId'] as String? ?? '';
-      return {'id': d.id, ...data, 'marketLogoUrl': marketLogos[marketId] ?? ''};
-    }).toList();
+    _activeCampaigns = [
+      ...active.take(200).map((d) {
+        final data = d.data();
+        final marketId = data['marketId'] as String? ?? '';
+        return {'id': d.id, ...data, 'marketLogoUrl': marketLogos[marketId] ?? ''};
+      }),
+      ...upcoming.take(50).map((d) {
+        final data = d.data();
+        final marketId = data['marketId'] as String? ?? '';
+        return {'id': d.id, ...data, 'marketLogoUrl': marketLogos[marketId] ?? ''};
+      }),
+    ];
 
-    if (active.isEmpty) return 'Şu an aktif kampanya bulunmuyor.';
+    if (active.isEmpty && upcoming.isEmpty) return 'Şu an aktif kampanya bulunmuyor.';
 
-    final sb = StringBuffer();
-    sb.writeln('Aktif kampanyalar (ID|Ürün|Market|Kategori|Fiyat Bilgisi|Bitiş):\n');
-
-    for (final doc in active) {
-      final data = doc.data();
-      final product = data['product'] as String? ?? '';
-      final market = data['marketName'] as String? ?? '';
-      final category = data['categoryName'] as String? ?? '';
+    String priceInfo(Map<String, dynamic> data) {
       final type = data['campaignType'] as String? ?? '';
-      final endDate = (data['endDate'] as Timestamp?)?.toDate();
-
-      String priceInfo = '';
       if (type == 'priceDiscount') {
         final oldP = (data['oldPrice'] as num?)?.toDouble() ?? 0;
         final newP = (data['newPrice'] as num?)?.toDouble() ?? 0;
         final pct = oldP > 0 ? ((oldP - newP) / oldP * 100).round() : 0;
-        priceInfo = '${_priceFmt.format(oldP)} TL → ${_priceFmt.format(newP)} TL (%$pct indirim)';
+        return '${_priceFmt.format(oldP)} TL → ${_priceFmt.format(newP)} TL (%$pct indirim)';
       } else if (type == 'buyOneGetOne') {
         final price = (data['productPrice'] as num?)?.toDouble() ?? 0;
-        priceInfo = '1 alana 1 bedava (${_priceFmt.format(price)} TL)';
+        return '1 alana 1 bedava (${_priceFmt.format(price)} TL)';
       } else if (type == 'secondDiscount') {
         final rate = (data['discountRate'] as num?)?.toInt() ?? 0;
         final price = (data['productPrice'] as num?)?.toDouble() ?? 0;
-        priceInfo = '2. üründe %$rate indirim (${_priceFmt.format(price)} TL)';
+        return '2. üründe %$rate indirim (${_priceFmt.format(price)} TL)';
       }
+      return '';
+    }
 
-      sb.writeln('${doc.id}|$product|$market|$category|$priceInfo|${endDate != null ? _dateFmt.format(endDate) : "-"}');
+    final sb = StringBuffer();
+
+    if (active.isNotEmpty) {
+      sb.writeln('Aktif kampanyalar (ID|Ürün|Market|Kategori|Fiyat Bilgisi|Bitiş):\n');
+      for (final doc in active.take(200)) {
+        final data = doc.data();
+        final product = data['product'] as String? ?? '';
+        final market = data['marketName'] as String? ?? '';
+        final category = data['categoryName'] as String? ?? '';
+        final endDate = (data['endDate'] as Timestamp?)?.toDate();
+        sb.writeln('${doc.id}|$product|$market|$category|${priceInfo(data)}|${endDate != null ? _dateFmt.format(endDate) : "-"}');
+      }
+    }
+
+    if (upcoming.isNotEmpty) {
+      sb.writeln('\nYakında başlayacak kampanyalar (ID|Ürün|Market|Kategori|Fiyat Bilgisi|Başlangıç|Bitiş):\n');
+      for (final doc in upcoming.take(50)) {
+        final data = doc.data();
+        final product = data['product'] as String? ?? '';
+        final market = data['marketName'] as String? ?? '';
+        final category = data['categoryName'] as String? ?? '';
+        final startDate = (data['startDate'] as Timestamp?)?.toDate();
+        final endDate = (data['endDate'] as Timestamp?)?.toDate();
+        sb.writeln('${doc.id}|$product|$market|$category|${priceInfo(data)}|${startDate != null ? _dateFmt.format(startDate) : "-"}|${endDate != null ? _dateFmt.format(endDate) : "-"}');
+      }
     }
 
     return sb.toString();
@@ -241,6 +271,7 @@ Türkiye\'deki market kampanyaları hakkında yardım ediyorsun.
 Kısa, net ve samimi cevaplar ver. Türkçe eş anlamlı kelimeleri anla (tavuk=piliç=kanat=but=göğüs=baget, deterjan=çamaşır=temizlik, vb.).
 TL cinsinden tasarruf hesapları yap, bütçeye göre öneriler sun.
 Kahvaltı veya kahvaltılık denildiğinde şu ürünleri ara: peynir, zeytin, zeytinyağı, yumurta, domates, salatalık, reçel, bal, marmelat, nutella, çikolatalı krema, tereyağı, kaymak, ekmek, tost ekmeği, pide, açma, poğaça, simit, tahini, pekmez. Bu ürünlerin geçtiği TÜM kampanyaları ID listesine ekle.
+Kampanya verisinde "Yakında başlayacak kampanyalar" bölümü varsa: kullanıcı o ürünü sorarken şu an geçerli indirim yoksa ama yakında başlayacaksa bunu mutlaka belirt — örneğin "Şu an aktif değil ama X tarihinde başlıyor" veya "2 gün sonra bu indirim başlıyor" gibi. Kaç gün kaldığını hesapla ve söyle.
 
 ÖNEMLİ: Cevabının EN SONUNA, ilgili kampanyaların ID\'lerini şu formatta ekle (geniş kategori sorgularında max 15, dar sorgularda max 5):
 KAMPANYALAR:["id1","id2","id3"]

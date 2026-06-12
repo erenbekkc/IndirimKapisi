@@ -289,56 +289,48 @@ void main() {
       FirebaseCrashlytics.instance.log('Analytics init failed: $e');
     }
 
-    // 3) ATT (iOS) — AdMob'dan önce izin iste
-    if (Platform.isIOS) {
-      try {
-        final status = await AppTrackingTransparency.trackingAuthorizationStatus;
-        if (status == TrackingStatus.notDetermined) {
-          await Future.delayed(const Duration(milliseconds: 200));
-          await AppTrackingTransparency.requestTrackingAuthorization();
-        }
-      } catch (e) {
-        FirebaseCrashlytics.instance.log('ATT request failed: $e');
-      }
-    }
-
-    // 4) AdMob
-    try {
-      await MobileAds.instance.initialize();
-    } catch (e, s) {
-      FirebaseCrashlytics.instance.recordError(e, s, reason: 'MobileAds init');
-    }
-
-    // 5) Date formatting
-    try {
-      await initializeDateFormatting('tr_TR', null);
-    } catch (e) {
-      FirebaseCrashlytics.instance.log('DateFormatting init failed: $e');
-    }
-
-    // 6) FCM background handler
+    // 3) FCM background handler — runApp öncesi kayıt edilmeli
     try {
       FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     } catch (e) {
       FirebaseCrashlytics.instance.log('FCM background handler failed: $e');
     }
 
-    // 7) Local notifications
-    try {
-      await _initLocalNotifications();
-    } catch (e, s) {
-      _initError = 'LocalNotifications init FAILED:\n$e\n$s';
-      FirebaseCrashlytics.instance.recordError(e, s, reason: 'LocalNotifications init');
-      runApp(_ErrorApp(_initError!));
-      return;
-    }
+    // 4-8) Arka plan initleri — runApp'i bloke etme, paralelde çalıştır
+    Future(() async {
+      // ATT (iOS) — AdMob'dan önce izin iste
+      if (Platform.isIOS) {
+        try {
+          final status = await AppTrackingTransparency.trackingAuthorizationStatus;
+          if (status == TrackingStatus.notDetermined) {
+            await Future.delayed(const Duration(milliseconds: 200));
+            await AppTrackingTransparency.requestTrackingAuthorization();
+          }
+        } catch (e) {
+          FirebaseCrashlytics.instance.log('ATT request failed: $e');
+        }
+      }
 
-    // 8) Favorites
-    try {
-      await FavoritesManager.load();
-    } catch (e) {
-      FirebaseCrashlytics.instance.log('FavoritesManager.load failed: $e');
-    }
+      // AdMob — ağır init, arka planda yapılır; SplashScreen'in 1 sn beklemesi yeterli
+      try {
+        await MobileAds.instance.initialize();
+      } catch (e, s) {
+        FirebaseCrashlytics.instance.recordError(e, s, reason: 'MobileAds init');
+      }
+    });
+
+    // Date formatting + Notifications + Favorites — hızlı, paralelde çalıştır
+    await Future.wait([
+      initializeDateFormatting('tr_TR', null).catchError((e) {
+        FirebaseCrashlytics.instance.log('DateFormatting init failed: $e');
+      }),
+      _initLocalNotifications().catchError((e, s) {
+        FirebaseCrashlytics.instance.recordError(e, s, reason: 'LocalNotifications init');
+      }),
+      FavoritesManager.load().catchError((e) {
+        FirebaseCrashlytics.instance.log('FavoritesManager.load failed: $e');
+      }),
+    ]);
 
     // 9) Android: izin + token kaydet + topic
     if (!Platform.isIOS) {
