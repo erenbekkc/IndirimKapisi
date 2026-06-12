@@ -41,6 +41,7 @@ platform :ios do
       output_path: "/tmp/certs",
       keychain_path: keychain_path,
       keychain_password: keychain_password,
+      force: true,
     )
 
     # App Store Distribution provisioning profile indir/oluştur
