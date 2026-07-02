@@ -110,7 +110,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
     }
 
     _activeCampaigns = [
-      ...active.take(200).map((d) {
+      ...active.take(500).map((d) {
         final data = d.data();
         final marketId = data['marketId'] as String? ?? '';
         return {'id': d.id, ...data, 'marketLogoUrl': marketLogos[marketId] ?? ''};
@@ -146,7 +146,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
 
     if (active.isNotEmpty) {
       sb.writeln('Aktif kampanyalar (ID|Ürün|Market|Kategori|Fiyat Bilgisi|Bitiş):\n');
-      for (final doc in active.take(200)) {
+      for (final doc in active.take(500)) {
         final data = doc.data();
         final product = data['product'] as String? ?? '';
         final market = data['marketName'] as String? ?? '';
@@ -218,7 +218,17 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       int score = 0;
       for (final term in searchTerms) {
         if (term.length < 3) continue;
-        if (searchable.contains(term)) score++;
+        if (searchable.contains(term)) {
+          score++;
+        } else {
+          // Türkçe ek kontrolü: "migrostaki" → "migros" gibi
+          for (final w in searchable.split(RegExp(r'\s+'))) {
+            if (w.length >= 3 && term.startsWith(w)) {
+              score++;
+              break;
+            }
+          }
+        }
       }
       if (score > 0) scored.add({...c, '_score': score});
     }
