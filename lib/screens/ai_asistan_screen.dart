@@ -29,11 +29,30 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
   List<Map<String, dynamic>> _activeCampaigns = [];
 
   String? _apiKey;
+  String? _systemPrompt;
+
+  static const _kDefaultSystemPrompt =
+      'Sen İndirim Kapısı uygulamasının alışveriş asistanısın.\n'
+      'Bugünün tarihi: {TODAY}. Tarih sorarlarsa veya "bugün biten" gibi sorgularda bu tarihi kullan.\n'
+      'Türkiye\'deki market kampanyaları hakkında yardım ediyorsun.\n'
+      'Kısa, net ve samimi cevaplar ver. Türkçe eş anlamlı kelimeleri anla (tavuk=piliç=kanat=but=göğüs=baget, deterjan=çamaşır=temizlik, vb.).\n'
+      'TL cinsinden tasarruf hesapları yap, bütçeye göre öneriler sun.\n'
+      'Kahvaltı veya kahvaltılık denildiğinde şu ürünleri ara: peynir, zeytin, zeytinyağı, yumurta, domates, salatalık, reçel, bal, marmelat, nutella, çikolatalı krema, tereyağı, kaymak, ekmek, tost ekmeği, pide, açma, poğaça, simit, tahini, pekmez. Bu ürünlerin geçtiği TÜM kampanyaları ID listesine ekle.\n'
+      'Kampanya verisinde "Yakında başlayacak kampanyalar" bölümü varsa: kullanıcı o ürünü sorarken şu an geçerli indirim yoksa ama yakında başlayacaksa bunu mutlaka belirt — örneğin "Şu an aktif değil ama X tarihinde başlıyor" veya "2 gün sonra bu indirim başlıyor" gibi. Kaç gün kaldığını hesapla ve söyle.\n'
+      '\n'
+      'Cevabında kampanya kartları gösterilecekse (KAMPANYALAR listesi boş değilse), cevabının sonuna şunu ekle: "Ürünleri favorilerinize alın, indirimleri kaçırmayın! ❤️"\n'
+      '\n'
+      'ÖNEMLİ: Cevabının EN SONUNA, ilgili kampanyaların ID\'lerini şu formatta ekle (geniş kategori sorgularında max 15, dar sorgularda max 5):\n'
+      'KAMPANYALAR:["id1","id2","id3"]\n'
+      'İlgili kampanya yoksa: KAMPANYALAR:[]\n'
+      'Kahvaltı/kahvaltılık sorgularında listede peynir, zeytin, zeytinyağı, yumurta, domates, salatalık, reçel, bal, marmelat, nutella, çikolatalı krema, tereyağı, kaymak, ekmek, tost, pide, poğaça, simit, tahini, pekmez geçen TÜM kampanyaları ID\'ye ekle.';
 
   Future<void> _loadApiKey() async {
     try {
       final doc = await FirebaseFirestore.instance.collection('config').doc('ai').get();
       _apiKey = doc.data()?['apiKey'] as String?;
+      final prompt = doc.data()?['systemPrompt'] as String?;
+      if (prompt != null && prompt.isNotEmpty) _systemPrompt = prompt;
     } catch (e, s) {
       logError('ai_loadApiKey', e, s);
     }
@@ -110,7 +129,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
     }
 
     _activeCampaigns = [
-      ...active.take(500).map((d) {
+      ...active.take(1000).map((d) {
         final data = d.data();
         final marketId = data['marketId'] as String? ?? '';
         return {'id': d.id, ...data, 'marketLogoUrl': marketLogos[marketId] ?? ''};
@@ -146,7 +165,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
 
     if (active.isNotEmpty) {
       sb.writeln('Aktif kampanyalar (ID|Ürün|Market|Kategori|Fiyat Bilgisi|Bitiş):\n');
-      for (final doc in active.take(500)) {
+      for (final doc in active.take(1000)) {
         final data = doc.data();
         final product = data['product'] as String? ?? '';
         final market = data['marketName'] as String? ?? '';
@@ -265,6 +284,10 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       final context = await _fetchCampaignContext();
       final todayStr = DateFormat('d MMMM', 'tr_TR').format(DateTime.now());
 
+      final template = _systemPrompt ?? _kDefaultSystemPrompt;
+      final systemPrompt = template.replaceAll('{TODAY}', todayStr)
+          + '\n\nKampanya verisi (ID|Ürün|Market|Kategori|Fiyat|Bitiş):\n$context';
+
       final resp = await http.post(
         Uri.parse('https://api.anthropic.com/v1/messages'),
         headers: {
@@ -275,21 +298,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         body: jsonEncode({
           'model': 'claude-haiku-4-5-20251001',
           'max_tokens': 2048,
-          'system': '''Sen İndirim Kapısı uygulamasının alışveriş asistanısın.
-Bugünün tarihi: $todayStr. Tarih sorarlarsa veya "bugün biten" gibi sorgularda bu tarihi kullan.
-Türkiye\'deki market kampanyaları hakkında yardım ediyorsun.
-Kısa, net ve samimi cevaplar ver. Türkçe eş anlamlı kelimeleri anla (tavuk=piliç=kanat=but=göğüs=baget, deterjan=çamaşır=temizlik, vb.).
-TL cinsinden tasarruf hesapları yap, bütçeye göre öneriler sun.
-Kahvaltı veya kahvaltılık denildiğinde şu ürünleri ara: peynir, zeytin, zeytinyağı, yumurta, domates, salatalık, reçel, bal, marmelat, nutella, çikolatalı krema, tereyağı, kaymak, ekmek, tost ekmeği, pide, açma, poğaça, simit, tahini, pekmez. Bu ürünlerin geçtiği TÜM kampanyaları ID listesine ekle.
-Kampanya verisinde "Yakında başlayacak kampanyalar" bölümü varsa: kullanıcı o ürünü sorarken şu an geçerli indirim yoksa ama yakında başlayacaksa bunu mutlaka belirt — örneğin "Şu an aktif değil ama X tarihinde başlıyor" veya "2 gün sonra bu indirim başlıyor" gibi. Kaç gün kaldığını hesapla ve söyle.
-
-ÖNEMLİ: Cevabının EN SONUNA, ilgili kampanyaların ID\'lerini şu formatta ekle (geniş kategori sorgularında max 15, dar sorgularda max 5):
-KAMPANYALAR:["id1","id2","id3"]
-İlgili kampanya yoksa: KAMPANYALAR:[]
-Kahvaltı/kahvaltılık sorgularında listede peynir, zeytin, zeytinyağı, yumurta, domates, salatalık, reçel, bal, marmelat, nutella, çikolatalı krema, tereyağı, kaymak, ekmek, tost, pide, poğaça, simit, tahini, pekmez geçen TÜM kampanyaları ID\'ye ekle.
-
-Kampanya verisi (ID|Ürün|Market|Kategori|Fiyat|Bitiş):
-$context''',
+          'system': systemPrompt,
           'messages': [
             {'role': 'user', 'content': q}
           ],

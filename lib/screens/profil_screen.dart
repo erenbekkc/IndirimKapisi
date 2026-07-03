@@ -183,16 +183,27 @@ class _ProfilScreenState extends State<ProfilScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Row(children: [
-          Icon(Icons.notifications_outlined, color: Colors.white),
-          SizedBox(width: 8),
-          Text('Bildirimler',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        ]),
-        backgroundColor: const Color(0xFF16A34A),
-      ),
-      body: _loading
+      backgroundColor: const Color(0xFFF5F5F5),
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Row(
+                children: const [
+                  Icon(Icons.notifications_outlined, color: Color(0xFF16A34A), size: 26),
+                  SizedBox(width: 8),
+                  Text('Bildirimler',
+                      style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87)),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               children: [
@@ -241,6 +252,10 @@ class _ProfilScreenState extends State<ProfilScreen> {
                 ),
               ],
             ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

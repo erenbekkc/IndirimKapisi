@@ -150,11 +150,17 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         backgroundColor: Colors.transparent,
         elevation: 4,
         child: ClipOval(
-          child: Image.asset(
-            'assets/agent_gri.jpeg',
-            width: 56,
-            height: 56,
-            fit: BoxFit.cover,
+          child: ColorFiltered(
+            colorFilter: ColorFilter.mode(
+              const Color(0xFF22C55E).withOpacity(0.35),
+              BlendMode.srcATop,
+            ),
+            child: Image.asset(
+              'assets/agent_gri.jpeg',
+              width: 56,
+              height: 56,
+              fit: BoxFit.cover,
+            ),
           ),
         ),
       ),
