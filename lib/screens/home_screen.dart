@@ -9,7 +9,6 @@ import 'package:intl/intl.dart';
 import '../favorites_manager.dart';
 import '../widgets/image_lightbox.dart';
 import '../widgets/banner_ad_widget.dart';
-import '../widgets/banner_ad_widget.dart';
 import '../widgets/native_ad_widget.dart';
 import '../widgets/smart_title_text.dart';
 
@@ -743,28 +742,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Product name + heart top-right
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: SmartTitleText(
-                            data['product'] ?? data['title'] ?? '',
-                            fontSize: 13,
-                            color: isExpired ? Colors.grey : Colors.black87,
-                          ),
-                        ),
-                        ValueListenableBuilder<Set<String>>(
-                          valueListenable: FavoritesManager.notifier,
-                          builder: (_, favIds, __) {
-                            final isFav = favIds.contains(doc.id);
-                            return _FavoriteButton(
-                              isFav: isFav,
-                              onTap: () => FavoritesManager.toggle(doc.id, campaignData: data),
-                            );
-                          },
-                        ),
-                      ],
+                    // Product name
+                    SmartTitleText(
+                      data['product'] ?? data['title'] ?? '',
+                      fontSize: 13,
+                      color: isExpired ? Colors.grey : Colors.black87,
                     ),
                     const SizedBox(height: 6),
 
@@ -807,6 +789,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     _buildDateBadge(isEndingToday, isEndingTomorrow, isExpired, startDate, endDate),
                   ],
                 ),
+              ),
+
+              // ── Heart button (dış Row'da — ürün yüksekliğini etkilemez) ──
+              ValueListenableBuilder<Set<String>>(
+                valueListenable: FavoritesManager.notifier,
+                builder: (_, favIds, __) {
+                  final isFav = favIds.contains(doc.id);
+                  return _FavoriteButton(
+                    isFav: isFav,
+                    onTap: () => FavoritesManager.toggle(doc.id, campaignData: data),
+                  );
+                },
               ),
             ],
           ),

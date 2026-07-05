@@ -26,10 +26,6 @@ import 'session_tracker.dart';
 final FlutterLocalNotificationsPlugin localNotifications = FlutterLocalNotificationsPlugin();
 
 // ────────────────────────────────────────────────────────────────
-// Mevcut build numarası — her versiyonda güncellenir
-const int _kBuildNumber = 165;
-
-// ────────────────────────────────────────────────────────────────
 // Arka plan FCM handler — app kapalıyken de çalışır
 // Cloud Function'dan gelen sessiz data mesajını alır,
 // kullanıcının tercihlerine göre kişisel bildirim gösterir.
@@ -478,52 +474,8 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _checkVersionAndNavigate() async {
     if (!mounted) return;
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('config')
-          .doc('appConfig')
-          .get();
-      if (doc.exists) {
-        final minVersion = (doc.data()?['minVersion'] as num?)?.toInt() ?? 0;
-        if (minVersion > _kBuildNumber && mounted) {
-          final storeUrl = Platform.isIOS
-              ? (doc.data()?['iosStoreUrl'] as String? ?? '')
-              : (doc.data()?['androidStoreUrl'] as String? ?? '');
-          _showForceUpdateDialog(storeUrl);
-          return;
-        }
-      }
-    } catch (_) {}
-    if (mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainScreen()),
-      );
-    }
-  }
-
-  void _showForceUpdateDialog(String storeUrl) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => PopScope(
-        canPop: false,
-        child: AlertDialog(
-          title: const Text('Güncelleme Gerekli'),
-          content: const Text(
-            'İndirim Kapısı\'nın daha iyi çalışması için uygulamayı güncellemeniz gerekiyor.',
-          ),
-          actions: [
-            if (storeUrl.isNotEmpty)
-              TextButton(
-                onPressed: () async {
-                  final uri = Uri.parse(storeUrl);
-                  if (await canLaunchUrl(uri)) launchUrl(uri, mode: LaunchMode.externalApplication);
-                },
-                child: const Text('Güncelle', style: TextStyle(color: Color(0xFF16A34A))),
-              ),
-          ],
-        ),
-      ),
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const MainScreen()),
     );
   }
 

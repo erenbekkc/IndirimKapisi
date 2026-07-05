@@ -147,20 +147,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             MaterialPageRoute(builder: (_) => const AiAsistanScreen()),
           );
         },
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color(0xFFDCFCE7),
         elevation: 4,
         child: ClipOval(
-          child: ColorFiltered(
-            colorFilter: ColorFilter.mode(
-              const Color(0xFF22C55E).withOpacity(0.35),
-              BlendMode.srcATop,
-            ),
-            child: Image.asset(
-              'assets/agent_gri.jpeg',
-              width: 56,
-              height: 56,
-              fit: BoxFit.cover,
-            ),
+          child: Image.asset(
+            'assets/agent.jpeg',
+            width: 56,
+            height: 56,
+            fit: BoxFit.cover,
           ),
         ),
       ),

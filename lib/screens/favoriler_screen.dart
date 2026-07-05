@@ -33,8 +33,12 @@ class _FavorilerScreenState extends State<FavorilerScreen> {
   }
 
   Future<void> _loadIcons() async {
-    final markets    = await FirebaseFirestore.instance.collection('markets').get();
-    final categories = await FirebaseFirestore.instance.collection('categories').get();
+    final results = await Future.wait([
+      FirebaseFirestore.instance.collection('markets').get(),
+      FirebaseFirestore.instance.collection('categories').get(),
+    ]);
+    final markets    = results[0];
+    final categories = results[1];
     final mLogos     = <String, String?>{};
     final mByName    = <String, String?>{};
     for (final doc in markets.docs) {
@@ -415,6 +419,18 @@ class _FavorilerScreenState extends State<FavorilerScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Ürün adı
+                  SmartTitleText(
+                    data['product'] ?? data['title'] ?? '',
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Fiyat
+                  _buildPriceSection(data, fmt),
+                  const SizedBox(height: 4),
+
                   // Market + Kategori satırı
                   Row(
                     children: [
@@ -456,18 +472,6 @@ class _FavorilerScreenState extends State<FavorilerScreen> {
                       ],
                     ],
                   ),
-                  const SizedBox(height: 4),
-
-                  // Ürün adı
-                  SmartTitleText(
-                    data['product'] ?? data['title'] ?? '',
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  const SizedBox(height: 6),
-
-                  // Fiyat
-                  _buildPriceSection(data, fmt),
                 ],
               ),
             ),
@@ -525,6 +529,12 @@ class _FavorilerScreenState extends State<FavorilerScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text('${fmt.format(newP)} TL',
+              style: const TextStyle(
+                  fontSize: 15,
+                  color: _green,
+                  fontWeight: FontWeight.bold)),
+          const SizedBox(height: 3),
           Row(
             children: [
               Text('${fmt.format(oldP)} TL',
@@ -532,30 +542,23 @@ class _FavorilerScreenState extends State<FavorilerScreen> {
                       fontSize: 12,
                       color: Colors.black54,
                       decoration: TextDecoration.lineThrough)),
-              const SizedBox(width: 8),
-              Text('${fmt.format(newP)} TL',
-                  style: const TextStyle(
-                      fontSize: 15,
-                      color: _green,
-                      fontWeight: FontWeight.bold)),
+              if (pct > 0) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text('%$pct indirim',
+                      style: const TextStyle(
+                          fontSize: 10,
+                          color: _green,
+                          fontWeight: FontWeight.w600)),
+                ),
+              ],
             ],
           ),
-          if (pct > 0) ...[
-            const SizedBox(height: 5),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xFFECFDF5),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text('🔥 %$pct indirim',
-                  style: const TextStyle(
-                      fontSize: 11,
-                      color: _green,
-                      fontWeight: FontWeight.w600)),
-            ),
-          ],
         ],
       );
     }

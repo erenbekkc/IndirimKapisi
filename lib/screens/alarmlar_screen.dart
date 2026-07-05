@@ -31,8 +31,12 @@ class _AlarmlarScreenState extends State<AlarmlarScreen> {
   }
 
   Future<void> _loadIcons() async {
-    final markets    = await FirebaseFirestore.instance.collection('markets').get();
-    final categories = await FirebaseFirestore.instance.collection('categories').get();
+    final results = await Future.wait([
+      FirebaseFirestore.instance.collection('markets').get(),
+      FirebaseFirestore.instance.collection('categories').get(),
+    ]);
+    final markets    = results[0];
+    final categories = results[1];
     final mLogos     = <String, String?>{};
     final mByName    = <String, String?>{};
     for (final doc in markets.docs) {
@@ -81,11 +85,11 @@ class _AlarmlarScreenState extends State<AlarmlarScreen> {
           children: [
             // ── Başlık ────────────────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
               child: Row(
                 children: [
-                  const Text('🔥', style: TextStyle(fontSize: 26)),
-                  const SizedBox(width: 10),
+                  const Icon(Icons.local_fire_department_rounded, color: Color(0xFFEA580C), size: 26),
+                  const SizedBox(width: 8),
                   const Text('Alarmlar',
                       style: TextStyle(
                           fontSize: 24,
@@ -442,6 +446,18 @@ class _AlarmlarScreenState extends State<AlarmlarScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Ürün adı
+                  SmartTitleText(
+                    data['product'] ?? data['title'] ?? '',
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Fiyat
+                  _buildPriceSection(data, fmt),
+                  const SizedBox(height: 6),
+
                   // Market + kategori
                   Row(
                     children: [
@@ -485,27 +501,23 @@ class _AlarmlarScreenState extends State<AlarmlarScreen> {
                   ),
                   const SizedBox(height: 4),
 
-                  // Ürün adı
-                  SmartTitleText(
-                    data['product'] ?? data['title'] ?? '',
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  const SizedBox(height: 6),
-
-                  // Fiyat
-                  _buildPriceSection(data, fmt),
-                  const SizedBox(height: 6),
-
-                  // Bitiş tarihi
+                  // Bitiş satırı
                   Row(
                     children: [
-                      Icon(Icons.calendar_today_outlined,
-                          size: 11, color: Colors.grey.shade400),
+                      Icon(
+                        isToday ? Icons.hourglass_bottom : Icons.access_time,
+                        size: 13,
+                        color: isToday ? Colors.red : Colors.orange.shade700,
+                      ),
                       const SizedBox(width: 4),
-                      Text('Bitiş: ${dateFmt.format(endDate)}',
-                          style: TextStyle(
-                              fontSize: 11, color: Colors.grey.shade500)),
+                      Text(
+                        isToday ? 'Bugün bitiyor' : 'Yarın bitiyor',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isToday ? Colors.red : Colors.orange.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -513,44 +525,16 @@ class _AlarmlarScreenState extends State<AlarmlarScreen> {
             ),
             const SizedBox(width: 10),
 
-            // Sağ sütun: kalp üstte, badge altta
-            Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                ValueListenableBuilder<Set<String>>(
-                  valueListenable: FavoritesManager.notifier,
-                  builder: (_, favIds, __) {
-                    final isFav = favIds.contains(doc.id);
-                    return _FavoriteButton(
-                      isFav: isFav,
-                      onTap: () => FavoritesManager.toggle(doc.id),
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: isToday ? const Color(0xFFDC2626) : Colors.orange.shade600,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.alarm, color: Colors.white, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        isToday ? 'Bugün son!' : 'Yarın bitiyor!',
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            // Sağ sütun: kalp
+            ValueListenableBuilder<Set<String>>(
+              valueListenable: FavoritesManager.notifier,
+              builder: (_, favIds, __) {
+                final isFav = favIds.contains(doc.id);
+                return _FavoriteButton(
+                  isFav: isFav,
+                  onTap: () => FavoritesManager.toggle(doc.id),
+                );
+              },
             ),
           ],
         ),
@@ -569,6 +553,12 @@ class _AlarmlarScreenState extends State<AlarmlarScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text('${fmt.format(newP)} TL',
+              style: const TextStyle(
+                  fontSize: 15,
+                  color: _green,
+                  fontWeight: FontWeight.bold)),
+          const SizedBox(height: 3),
           Row(
             children: [
               Text('${fmt.format(oldP)} TL',
@@ -576,27 +566,21 @@ class _AlarmlarScreenState extends State<AlarmlarScreen> {
                       fontSize: 12,
                       color: Colors.black38,
                       decoration: TextDecoration.lineThrough)),
-              const SizedBox(width: 8),
-              Text('${fmt.format(newP)} TL',
-                  style: const TextStyle(
-                      fontSize: 15,
-                      color: _green,
-                      fontWeight: FontWeight.bold)),
+              if (pct > 0) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text('%$pct indirim',
+                      style: const TextStyle(
+                          fontSize: 10, color: _green, fontWeight: FontWeight.w600)),
+                ),
+              ],
             ],
           ),
-          if (pct > 0) ...[
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xFFECFDF5),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text('🔥 %$pct indirim',
-                  style: const TextStyle(
-                      fontSize: 11, color: _green, fontWeight: FontWeight.w600)),
-            ),
-          ],
         ],
       );
     }

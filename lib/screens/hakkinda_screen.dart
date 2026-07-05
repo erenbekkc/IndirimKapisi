@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'settings_screen.dart' show getOrCreateUserId;
 
 class HakkindaScreen extends StatelessWidget {
   const HakkindaScreen({super.key});
@@ -67,7 +70,73 @@ class HakkindaScreen extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 28),
+              const SizedBox(height: 20),
+
+              // Instagram takip butonu
+              GestureDetector(
+                onTap: () async {
+                  final uid = await getOrCreateUserId();
+                  FirebaseFirestore.instance.collection('instagram_clicks').add({
+                    'uid': uid,
+                    'clickedAt': FieldValue.serverTimestamp(),
+                  });
+                  launchUrl(
+                    Uri.parse('https://www.instagram.com/indirimkapisiapp?igsh=aHFpbWI2NHpzd3o0'),
+                    mode: LaunchMode.externalApplication,
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFf09433), Color(0xFFe6683c), Color(0xFFdc2743), Color(0xFFcc2366), Color(0xFFbc1888)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFdc2743).withOpacity(0.30),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.20),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.photo_camera_rounded, color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Bizi Instagram\'da Takip Edin',
+                            style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
+                          ),
+                          Text(
+                            '@indirimkapisiapp',
+                            style: TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
 
               _buildCard(
                 icon: Icons.storefront_rounded,

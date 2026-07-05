@@ -41,7 +41,7 @@ class SessionTracker {
         prefs.setInt(_keyStart, DateTime.now().millisecondsSinceEpoch);
         prefs.setBool(_keyIsFirst, isFirst);
         prefs.setInt(_keyAds, 0);
-        // İlk açılışı hemen işaretle (Firestore yazımını bekleme)
+        // İlk açılışı hemen işaretle — duplicate önlemek için erken set et
         if (isFirst) prefs.setBool(_keyFirstDone, true);
         _adsThisSession = 0;
       } catch (e, s) {
@@ -70,11 +70,12 @@ class SessionTracker {
     // _keyStart'ı hemen temizle — çift kayıt engellemek için
     prefs.remove(_keyStart);
 
-    if (durationSecs < 5 || durationSecs > 3600) return;
-
     final uid     = prefs.getString('app_user_id');
     final city    = prefs.getString(_keyCity) ?? 'Bilinmiyor';
     final isFirst = prefs.getBool(_keyIsFirst) ?? false;
+
+    // İlk açılış kaydı 5sn koşulundan muaf — kısa oturumda bile yazılsın
+    if (!isFirst && (durationSecs < 5 || durationSecs > 3600)) return;
     final dateStr = DateFormat('yyyy-MM-dd').format(
         DateTime.fromMillisecondsSinceEpoch(startMs));
 

@@ -40,7 +40,9 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       'Kahvaltı veya kahvaltılık denildiğinde şu ürünleri ara: peynir, zeytin, zeytinyağı, yumurta, domates, salatalık, reçel, bal, marmelat, nutella, çikolatalı krema, tereyağı, kaymak, ekmek, tost ekmeği, pide, açma, poğaça, simit, tahini, pekmez. Bu ürünlerin geçtiği TÜM kampanyaları ID listesine ekle.\n'
       'Kampanya verisinde "Yakında başlayacak kampanyalar" bölümü varsa: kullanıcı o ürünü sorarken şu an geçerli indirim yoksa ama yakında başlayacaksa bunu mutlaka belirt — örneğin "Şu an aktif değil ama X tarihinde başlıyor" veya "2 gün sonra bu indirim başlıyor" gibi. Kaç gün kaldığını hesapla ve söyle.\n'
       '\n'
-      'Cevabında kampanya kartları gösterilecekse (KAMPANYALAR listesi boş değilse), cevabının sonuna şunu ekle: "Ürünleri favorilerinize alın, indirimleri kaçırmayın! ❤️"\n'
+      'FORMAT KURALI (KESİNLİKLE UYULMASI GEREKİYOR): Kampanyaları asla liste veya tablo olarak gösterme. "## Aktif İndirimler:" gibi başlıklar veya markdown tabloları (| ile başlayan satırlar) KULLANMA. Sadece kısa bir özet cümle yaz (örn: "X markette 5 tavuk kampanyası buldum, aşağıda görebilirsin."). Fiyat, marka, indirim oranı gibi kampanya detaylarını tekrar yazma — bunlar zaten altta kartlarda gösterilecek.\n'
+      '\n'
+      'Cevabında kampanya kartları gösterilecekse (KAMPANYALAR listesi boş değilse), cevabının sonuna mutlaka şunu ekle: "Kartlardaki ❤️ ikonuna dokunarak favorilerinize ekleyin, indirimleri kaçırmayın!"\n'
       '\n'
       'ÖNEMLİ: Cevabının EN SONUNA, ilgili kampanyaların ID\'lerini şu formatta ekle (geniş kategori sorgularında max 15, dar sorgularda max 5):\n'
       'KAMPANYALAR:["id1","id2","id3"]\n'
@@ -121,7 +123,11 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       if (endDate == null) continue;
       final endDay = DateTime(endDate.year, endDate.month, endDate.day);
       if (endDay.isBefore(today)) continue;
-      if (startDate != null && startDate.isAfter(now)) {
+      // Gün bazında karşılaştır: bugün başlayan kampanya aktif sayılır
+      final startDay = startDate != null
+          ? DateTime(startDate.year, startDate.month, startDate.day)
+          : null;
+      if (startDay != null && startDay.isAfter(today)) {
         upcoming.add(d);
       } else {
         active.add(d);
@@ -309,6 +315,22 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         final body = jsonDecode(utf8.decode(resp.bodyBytes));
         String reply = (body['content'] as List).first['text'] as String;
 
+        // Markdown yapılarını ve kampanya detay listelerini temizle
+        // 1. Markdown başlıkları (# ## ###)
+        reply = reply.replaceAll(RegExp(r'^#{1,3}\s*.+$', multiLine: true), '');
+        // 2. Tablo satırları (| ile başlayan)
+        reply = reply.replaceAll(RegExp(r'^\s*\|.*$', multiLine: true), '');
+        // 3. Market grup başlıkları (**A101'de:** gibi)
+        reply = reply.replaceAll(RegExp(r'^\s*\*\*[^\n*]+\*\*:?\s*$', multiLine: true), '');
+        // 4. Numaralı liste satırları (1. 2. 3. ...)
+        reply = reply.replaceAll(RegExp(r'^\s*\d+\.\s+.*$', multiLine: true), '');
+        // 5. Fiyat/indirim detayı içeren madde satırları (girintili dahil)
+        reply = reply.replaceAll(RegExp(r'^\s*[-•]\s+.*(?:TL|%\d+|Bitiş:|→).*$', multiLine: true), '');
+        // 6. Kalan **bold** markdown işaretlerini kaldır
+        reply = reply.replaceAllMapped(RegExp(r'\*\*([^*]+)\*\*'), (m) => m.group(1) ?? '');
+        // 7. Fazla boş satırları temizle
+        reply = reply.replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
+
         // AI cevabından KAMPANYALAR:[...] kısmını parse et
         final kampanyalarRegex = RegExp(r'KAMPANYALAR:\[([^\]]*)\]');
         final kampanyalarMatch = kampanyalarRegex.firstMatch(reply);
@@ -394,32 +416,49 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Row(children: [
-          CircleAvatar(
-            radius: 14,
-            backgroundImage: AssetImage('assets/agent_gri.jpeg'),
-            backgroundColor: Colors.transparent,
+  static const _green = Color(0xFF16A34A);
+
+  Widget _buildHeader() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(4, 8, 8, 10),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back, color: _green),
+            onPressed: () => Navigator.pop(context),
           ),
-          SizedBox(width: 8),
-          Text('İndirim ve Fırsat Asistanı',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-        ]),
-        backgroundColor: const Color(0xFF16A34A),
-        iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              color: Color(0xFFDCFCE7),
+              shape: BoxShape.circle,
+            ),
+            padding: const EdgeInsets.all(5),
+            child: ClipOval(
+              child: Image.asset('assets/agent.jpeg', fit: BoxFit.cover),
+            ),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'İndirim ve Fırsat Asistanı',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87),
+            ),
+          ),
           if (_persistedMessages.length > 1)
             IconButton(
-              icon: const Icon(Icons.delete_outline, color: Colors.white),
+              icon: Icon(Icons.delete_outline, color: Colors.grey.shade500),
               tooltip: 'Sohbeti Temizle',
               onPressed: () {
                 setState(() {
                   _persistedMessages.clear();
                   _persistedMessages.add(_ChatMessage(
-                    text: 'Merhaba! 👋 Ben İndirim ve Fırsat Asistanıyım.\n\nMevcut kampanyalar hakkında her şeyi sorabilirsin!',
+                    text: 'Merhaba! 👋 Ben İndirim ve Fırsat Asistanıyım.\n\nMevcut kampanyalar hakkında her şeyi sorabilirsin. Bütçene göre öneri, market karşılaştırması, kategori bazlı arama yapabilirim!',
                     isUser: false,
                   ));
                 });
@@ -427,8 +466,18 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
             ),
         ],
       ),
-      body: Column(
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: SafeArea(
+        child: Column(
         children: [
+          _buildHeader(),
+          Divider(height: 1, color: Colors.grey.shade200),
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
@@ -511,6 +560,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -526,8 +576,16 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               if (!msg.isUser) ...[
-                ClipOval(
-                  child: Image.asset('assets/agent_gri.jpeg', width: 32, height: 32, fit: BoxFit.cover),
+                Container(
+                  width: 32, height: 32,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFDCFCE7),
+                    shape: BoxShape.circle,
+                  ),
+                  padding: const EdgeInsets.all(4),
+                  child: ClipOval(
+                    child: Image.asset('assets/agent.jpeg', fit: BoxFit.cover),
+                  ),
                 ),
                 const SizedBox(width: 8),
               ],
@@ -683,21 +741,23 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
                   children: [
                     Text(product,
                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    if (priceWidget != null) priceWidget,
                     const SizedBox(height: 2),
                     Row(
                       children: [
                         if ((c['marketLogoUrl'] as String?) != null && (c['marketLogoUrl'] as String).isNotEmpty)
-                          ClipOval(child: Image.network(c['marketLogoUrl'] as String, width: 14, height: 14, fit: BoxFit.cover))
+                          ClipOval(child: Image.network(c['marketLogoUrl'] as String, width: 13, height: 13, fit: BoxFit.cover))
                         else
-                          Icon(Icons.store, size: 13, color: Colors.grey.shade400),
+                          Icon(Icons.store, size: 12, color: Colors.grey.shade400),
                         const SizedBox(width: 4),
-                        Text(market, style: const TextStyle(fontSize: 11, color: Colors.black87)),
+                        Text(market, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                        if (endDate != null) ...[
+                          Text('  ·  ', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+                          Text('Bitiş: ${_dateFmt.format(endDate)}',
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                        ],
                       ],
                     ),
-                    if (priceWidget != null) priceWidget,
-                    if (endDate != null)
-                      Text('Bitiş: ${_dateFmt.format(endDate)}',
-                          style: const TextStyle(fontSize: 11, color: Colors.black87)),
                   ],
                 ),
               ),
@@ -725,8 +785,16 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          ClipOval(
-            child: Image.asset('assets/agent_gri.jpeg', width: 32, height: 32, fit: BoxFit.cover),
+          Container(
+            width: 32, height: 32,
+            decoration: const BoxDecoration(
+              color: Color(0xFFDCFCE7),
+              shape: BoxShape.circle,
+            ),
+            padding: const EdgeInsets.all(4),
+            child: ClipOval(
+              child: Image.asset('assets/agent.jpeg', fit: BoxFit.cover),
+            ),
           ),
           const SizedBox(width: 8),
           Container(
