@@ -42,6 +42,8 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       '\n'
       'FORMAT KURALI (KESİNLİKLE UYULMASI GEREKİYOR): Kampanyaları asla liste veya tablo olarak gösterme. "## Aktif İndirimler:" gibi başlıklar veya markdown tabloları (| ile başlayan satırlar) KULLANMA. Sadece kısa bir özet cümle yaz (örn: "X markette 5 tavuk kampanyası buldum, aşağıda görebilirsin."). Fiyat, marka, indirim oranı gibi kampanya detaylarını tekrar yazma — bunlar zaten altta kartlarda gösterilecek.\n'
       '\n'
+      'YASAK İFADELER (KESİNLİKLE KULLANMA): "markete gidip sorabilirsiniz", "marketi ziyaret edin", "birkaç gün sonra tekrar kontrol edin", "web sitesini ziyaret edin", "müşteri hizmetleri", "stok durumuna göre değişebilir". Kampanya verilerinde yoksa sadece "Şu an bu ürün için aktif kampanya bulamadım" de ve başka aktif kampanyalardan kısa bir öneri sun.\n'
+      '\n'
       'Cevabında kampanya kartları gösterilecekse (KAMPANYALAR listesi boş değilse), cevabının sonuna mutlaka şunu ekle: "Kartlardaki ❤️ ikonuna dokunarak favorilerinize ekleyin, indirimleri kaçırmayın!"\n'
       '\n'
       'ÖNEMLİ: Cevabının EN SONUNA, ilgili kampanyaların ID\'lerini şu formatta ekle (geniş kategori sorgularında max 15, dar sorgularda max 5):\n'
@@ -315,20 +317,18 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         final body = jsonDecode(utf8.decode(resp.bodyBytes));
         String reply = (body['content'] as List).first['text'] as String;
 
-        // Markdown yapılarını ve kampanya detay listelerini temizle
+        // Markdown yapılarını temizle
         // 1. Markdown başlıkları (# ## ###)
         reply = reply.replaceAll(RegExp(r'^#{1,3}\s*.+$', multiLine: true), '');
         // 2. Tablo satırları (| ile başlayan)
         reply = reply.replaceAll(RegExp(r'^\s*\|.*$', multiLine: true), '');
-        // 3. Market grup başlıkları (**A101'de:** gibi)
-        reply = reply.replaceAll(RegExp(r'^\s*\*\*[^\n*]+\*\*:?\s*$', multiLine: true), '');
-        // 4. Numaralı liste satırları (1. 2. 3. ...)
+        // 3. Numaralı liste satırları (1. 2. 3. ...)
         reply = reply.replaceAll(RegExp(r'^\s*\d+\.\s+.*$', multiLine: true), '');
-        // 5. Fiyat/indirim detayı içeren madde satırları (girintili dahil)
-        reply = reply.replaceAll(RegExp(r'^\s*[-•]\s+.*(?:TL|%\d+|Bitiş:|→).*$', multiLine: true), '');
-        // 6. Kalan **bold** markdown işaretlerini kaldır
+        // 4. Tüm madde işareti satırları (- veya • ile başlayan)
+        reply = reply.replaceAll(RegExp(r'^\s*[-•]\s+.*$', multiLine: true), '');
+        // 5. Kalan **bold** markdown işaretlerini kaldır
         reply = reply.replaceAllMapped(RegExp(r'\*\*([^*]+)\*\*'), (m) => m.group(1) ?? '');
-        // 7. Fazla boş satırları temizle
+        // 6. Fazla boş satırları temizle
         reply = reply.replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
 
         // AI cevabından KAMPANYALAR:[...] kısmını parse et

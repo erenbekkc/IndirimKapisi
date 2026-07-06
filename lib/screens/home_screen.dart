@@ -13,9 +13,6 @@ import '../widgets/native_ad_widget.dart';
 import '../widgets/smart_title_text.dart';
 
 class HomeScreen extends StatefulWidget {
-  static final searchBarKey    = GlobalKey();
-  static final campaignListKey = GlobalKey();
-  static final filterBarKey    = GlobalKey();
 
   const HomeScreen({super.key});
 
@@ -178,7 +175,6 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Expanded(
                 child: CustomScrollView(
-                  key: HomeScreen.campaignListKey,
                   slivers: [
                     const SliverToBoxAdapter(
                       child: Padding(
@@ -189,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     SliverToBoxAdapter(child: _buildAiSection()),
                     SliverToBoxAdapter(child: _buildMarketsSection()),
                     SliverToBoxAdapter(child: _buildCategoriesSection()),
-                    SliverToBoxAdapter(key: HomeScreen.filterBarKey, child: _buildCampaignHeader()),
+                    SliverToBoxAdapter(child: _buildCampaignHeader()),
                     _buildCampaignSliver(),
                     const SliverToBoxAdapter(child: SizedBox(height: 16)),
                   ],
@@ -206,7 +202,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildAiSection() {
     return Container(
-      key: HomeScreen.searchBarKey,
       margin: const EdgeInsets.fromLTRB(14, 4, 14, 12),
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
       decoration: BoxDecoration(

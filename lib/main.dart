@@ -333,15 +333,20 @@ void main() {
       }),
     ]);
 
-    // 9) Android: izin + token kaydet + topic
+    // 9) Android: izin + token kaydet + topic (sadece token değişmişse Firestore'a yaz)
     if (!Platform.isIOS) {
       Future(() async {
         try {
           await FirebaseMessaging.instance.requestPermission();
           final prefs      = await SharedPreferences.getInstance();
-          final markets    = (prefs.getStringList('subscribed_markets')    ?? []).toSet();
-          final categories = (prefs.getStringList('subscribed_categories') ?? []).toSet();
-          await saveUserPrefsToFirestore(markets: markets, categories: categories);
+          final newToken   = await FirebaseMessaging.instance.getToken();
+          final savedToken = prefs.getString('fcm_token_saved');
+          if (newToken != null && newToken != savedToken) {
+            final markets    = (prefs.getStringList('subscribed_markets')    ?? []).toSet();
+            final categories = (prefs.getStringList('subscribed_categories') ?? []).toSet();
+            await saveUserPrefsToFirestore(markets: markets, categories: categories);
+            await prefs.setString('fcm_token_saved', newToken);
+          }
         } catch (e, s) {
           logError('startup_android_saveUserPrefs', e, s);
         }
@@ -349,7 +354,7 @@ void main() {
       });
     }
 
-    // 10) iOS: önce APNS token bekle, sonra FCM token kaydet + topic
+    // 10) iOS: önce APNS token bekle, sonra FCM token kaydet + topic (sadece token değişmişse)
     if (Platform.isIOS) {
       Future(() async {
         try {
@@ -362,9 +367,14 @@ void main() {
           }
           // APNS hazır — FCM token artık geçerli
           final prefs      = await SharedPreferences.getInstance();
-          final markets    = (prefs.getStringList('subscribed_markets')    ?? []).toSet();
-          final categories = (prefs.getStringList('subscribed_categories') ?? []).toSet();
-          await saveUserPrefsToFirestore(markets: markets, categories: categories);
+          final newToken   = await FirebaseMessaging.instance.getToken();
+          final savedToken = prefs.getString('fcm_token_saved');
+          if (newToken != null && newToken != savedToken) {
+            final markets    = (prefs.getStringList('subscribed_markets')    ?? []).toSet();
+            final categories = (prefs.getStringList('subscribed_categories') ?? []).toSet();
+            await saveUserPrefsToFirestore(markets: markets, categories: categories);
+            await prefs.setString('fcm_token_saved', newToken);
+          }
         } catch (e, s) {
           logError('startup_ios_saveUserPrefs', e, s);
         }
