@@ -5,6 +5,7 @@ import '../favorites_manager.dart';
 import '../widgets/native_ad_widget.dart';
 import '../widgets/smart_title_text.dart';
 import '../widgets/image_lightbox.dart';
+import '../remote_config_service.dart';
 
 enum SonFirsatFilter { tumu, bugun, yarin, yuzotuzArti }
 
@@ -197,8 +198,10 @@ class _AlarmlarScreenState extends State<AlarmlarScreen> {
 
                   // 2 header items (banner + filter) + campaigns with ads
                   const headerCount = 2;
-                  final baseCount = filtered.length + (filtered.length ~/ 5);
-                  final campaignTotal = baseCount % 6 == 0 ? baseCount : baseCount + 1;
+                  final freq = RemoteConfigService.instance.adFrequency;
+                  final slot = freq + 1;
+                  final baseCount = filtered.length + (filtered.length ~/ freq);
+                  final campaignTotal = baseCount % slot == 0 ? baseCount : baseCount + 1;
                   final totalCount = headerCount + campaignTotal;
 
                   return ListView.separated(
@@ -214,9 +217,9 @@ class _AlarmlarScreenState extends State<AlarmlarScreen> {
                         return _buildFilterTabs(allDocs.length, todayCount, yarinCount, yuzotuzCount);
                       }
                       final ci = i - headerCount;
-                      if (ci == campaignTotal - 1 && baseCount % 6 != 0) return const NativeAdWidget();
-                      if ((ci + 1) % 6 == 0) return const NativeAdWidget();
-                      final adCount = ci ~/ 6;
+                      if (ci == campaignTotal - 1 && baseCount % slot != 0) return const NativeAdWidget();
+                      if ((ci + 1) % slot == 0) return const NativeAdWidget();
+                      final adCount = ci ~/ slot;
                       return _buildCard(filtered[ci - adCount], today, now, fmt, dateFmt);
                     },
                   );

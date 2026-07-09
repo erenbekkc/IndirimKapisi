@@ -11,6 +11,7 @@ import '../widgets/image_lightbox.dart';
 import '../widgets/banner_ad_widget.dart';
 import '../widgets/native_ad_widget.dart';
 import '../widgets/smart_title_text.dart';
+import '../remote_config_service.dart';
 
 class HomeScreen extends StatefulWidget {
 
@@ -624,12 +625,14 @@ class _HomeScreenState extends State<HomeScreen> {
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, i) {
-            // Every 7th item (index 6, 13, 20...) is an ad
-            if ((i + 1) % 7 == 0) return const Padding(
+            // Remote Config'den gelen sıklıkta reklam kartı göster
+            final freq = RemoteConfigService.instance.adFrequency;
+            final slot = freq + 1;
+            if ((i + 1) % slot == 0) return const Padding(
               padding: EdgeInsets.only(bottom: 10),
               child: NativeAdWidget(),
             );
-            final adsBefore = i ~/ 7;
+            final adsBefore = i ~/ slot;
             final campaignIndex = i - adsBefore;
             if (campaignIndex >= docs.length) return null;
             return Padding(

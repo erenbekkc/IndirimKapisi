@@ -21,6 +21,7 @@ import 'screens/main_screen.dart';
 import 'screens/settings_screen.dart' show saveUserPrefsToFirestore, getOrCreateUserId;
 import 'app_logger.dart';
 import 'notification_logger.dart';
+import 'remote_config_service.dart';
 import 'session_tracker.dart';
 
 final FlutterLocalNotificationsPlugin localNotifications = FlutterLocalNotificationsPlugin();
@@ -320,7 +321,7 @@ void main() {
       }
     });
 
-    // Date formatting + Notifications + Favorites — hızlı, paralelde çalıştır
+    // Date formatting + Notifications + Favorites + Remote Config — paralelde çalıştır
     await Future.wait([
       initializeDateFormatting('tr_TR', null).catchError((e) {
         FirebaseCrashlytics.instance.log('DateFormatting init failed: $e');
@@ -330,6 +331,9 @@ void main() {
       }),
       FavoritesManager.load().catchError((e) {
         FirebaseCrashlytics.instance.log('FavoritesManager.load failed: $e');
+      }),
+      RemoteConfigService.instance.init().catchError((e) {
+        FirebaseCrashlytics.instance.log('RemoteConfig init failed: $e');
       }),
     ]);
 

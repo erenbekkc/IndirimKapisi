@@ -7,7 +7,9 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import '../favorites_manager.dart';
 import '../widgets/image_lightbox.dart';
+import '../widgets/native_ad_widget.dart';
 import '../app_logger.dart';
+import '../remote_config_service.dart';
 import 'settings_screen.dart' show getOrCreateUserId;
 
 // Mesajlar uygulama açık olduğu sürece korunur
@@ -638,7 +640,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
                     child: Text('İlgili kampanyalar:',
                         style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
                   ),
-                  ...msg.matchedCampaigns.map((c) => _buildCampaignCard(c)),
+                  ..._buildCampaignListWithAds(msg.matchedCampaigns),
                 ],
               ),
             ),
@@ -646,6 +648,32 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         ],
       ),
     );
+  }
+
+  /// Kampanya kartları arasına reklam kartı ekler.
+  /// Her [freq] kampanya kartından sonra 1 reklam; [freq]'den az ürün varsa en alta 1 reklam.
+  List<Widget> _buildCampaignListWithAds(List<Map<String, dynamic>> campaigns) {
+    final freq   = RemoteConfigService.instance.adFrequency;
+    final result = <Widget>[];
+    for (int i = 0; i < campaigns.length; i++) {
+      result.add(_buildCampaignCard(campaigns[i]));
+      final isLast    = i == campaigns.length - 1;
+      final hitFreq   = (i + 1) % freq == 0;
+      if (hitFreq && !isLast) {
+        result.add(const Padding(
+          padding: EdgeInsets.symmetric(vertical: 6),
+          child: NativeAdWidget(),
+        ));
+      }
+    }
+    // 5'ten az ürün varsa veya son gruptan sonra: en alta 1 reklam
+    if (campaigns.isNotEmpty && campaigns.length % freq != 0) {
+      result.add(const Padding(
+        padding: EdgeInsets.only(top: 6),
+        child: NativeAdWidget(),
+      ));
+    }
+    return result;
   }
 
   Widget _buildCampaignCard(Map<String, dynamic> c) {

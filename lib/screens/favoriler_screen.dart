@@ -6,6 +6,7 @@ import '../favourite_logger.dart';
 import '../widgets/image_lightbox.dart';
 import '../widgets/native_ad_widget.dart';
 import '../widgets/smart_title_text.dart';
+import '../remote_config_service.dart';
 
 enum FavFilter { tumu, aktif, yakinda }
 
@@ -182,7 +183,10 @@ class _FavorilerScreenState extends State<FavorilerScreen> {
                               return Column(
                                 children: [
                                   if (totalSavings > 0)
-                                    _buildSavingsBanner(totalSavings, fmt),
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+                                      child: _buildSavingsBanner(totalSavings, fmt),
+                                    ),
                                   _buildFilterTabs(allFavDocs.length,
                                       activeCount, upcomingCount),
                                   Expanded(
@@ -199,8 +203,10 @@ class _FavorilerScreenState extends State<FavorilerScreen> {
                               );
                             }
                             final headerCount = totalSavings > 0 ? 2 : 1;
-                            final base = filtered.length + (filtered.length ~/ 5);
-                            final campaignTotal = base % 6 == 0 ? base : base + 1;
+                            final freq = RemoteConfigService.instance.adFrequency;
+                            final slot = freq + 1;
+                            final base = filtered.length + (filtered.length ~/ freq);
+                            final campaignTotal = base % slot == 0 ? base : base + 1;
                             return ListView.separated(
                               padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
                               itemCount: headerCount + campaignTotal,
@@ -220,10 +226,10 @@ class _FavorilerScreenState extends State<FavorilerScreen> {
                                       activeCount, upcomingCount);
                                 }
                                 final ci = i - headerCount;
-                                if (ci == campaignTotal - 1 && base % 6 != 0)
+                                if (ci == campaignTotal - 1 && base % slot != 0)
                                   return const NativeAdWidget();
-                                if ((ci + 1) % 6 == 0) return const NativeAdWidget();
-                                final adCount = ci ~/ 6;
+                                if ((ci + 1) % slot == 0) return const NativeAdWidget();
+                                final adCount = ci ~/ slot;
                                 return _buildFavCard(
                                     filtered[ci - adCount], now, fmt);
                               },

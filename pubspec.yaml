@@ -1,7 +1,7 @@
 name: indirim_radari
 description: "İndirim Kapısı - Market Kampanyaları"
 publish_to: 'none'
-version: 1.0.6+184
+version: 1.0.6+186
 
 environment:
   sdk: ^3.6.2
@@ -17,6 +17,7 @@ dependencies:
   firebase_messaging: ^15.1.0
   firebase_analytics: ^11.3.0
   firebase_crashlytics: ^4.1.0
+  firebase_remote_config: ^5.0.0
   flutter_local_notifications: ^17.2.0
   shared_preferences: ^2.3.0
   intl: any
