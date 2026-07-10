@@ -1,7 +1,7 @@
 name: indirim_radari
 description: "İndirim Kapısı - Market Kampanyaları"
 publish_to: 'none'
-version: 1.0.7+190
+version: 1.0.8+190
 
 environment:
   sdk: ^3.6.2
