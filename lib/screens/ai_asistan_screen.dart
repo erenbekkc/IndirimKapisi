@@ -27,6 +27,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   bool _loading = false;
+  double _questionScrollOffset = 0;
 
   List<Map<String, dynamic>> _activeCampaigns = [];
 
@@ -48,7 +49,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       '\n'
       'Cevabında kampanya kartları gösterilecekse (KAMPANYALAR listesi boş değilse), cevabının sonuna mutlaka şunu ekle: "Kartlardaki ❤️ ikonuna dokunarak favorilerinize ekleyin, indirimleri kaçırmayın!"\n'
       '\n'
-      'ÖNEMLİ: Cevabının EN SONUNA, ilgili kampanyaların ID\'lerini şu formatta ekle (geniş kategori sorgularında max 15, dar sorgularda max 5):\n'
+      'ÖNEMLİ: Cevabının EN SONUNA, ilgili kampanyaların ID\'lerini şu formatta ekle (geniş kategori sorgularında max 30, dar sorgularda max 15). TÜM marketlerdeki ilgili kampanyaları ekle, belirli bir marketi önceliklendirme:\n'
       'KAMPANYALAR:["id1","id2","id3"]\n'
       'İlgili kampanya yoksa: KAMPANYALAR:[]\n'
       'Kahvaltı/kahvaltılık sorgularında listede peynir, zeytin, zeytinyağı, yumurta, domates, salatalık, reçel, bal, marmelat, nutella, çikolatalı krema, tereyağı, kaymak, ekmek, tost, pide, poğaça, simit, tahini, pekmez geçen TÜM kampanyaları ID\'ye ekle.';
@@ -138,8 +139,26 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       }
     }
 
+    if (active.isEmpty && upcoming.isEmpty) return 'Şu an aktif kampanya bulunmuyor.';
+
+    // Marketler arası dengeli sıralama: A101, Migros, BİM, ŞOK dönüşümlü gelsin
+    final byMarket = <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
+    for (final d in active) {
+      final market = (d.data()['marketName'] as String? ?? 'Diğer').toLowerCase();
+      byMarket.putIfAbsent(market, () => []).add(d);
+    }
+    final interleavedActive = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+    final marketKeys = byMarket.keys.toList();
+    int maxLen = byMarket.values.fold(0, (m, l) => l.length > m ? l.length : m);
+    for (int i = 0; i < maxLen; i++) {
+      for (final key in marketKeys) {
+        final list = byMarket[key]!;
+        if (i < list.length) interleavedActive.add(list[i]);
+      }
+    }
+
     _activeCampaigns = [
-      ...active.take(1000).map((d) {
+      ...interleavedActive.take(1000).map((d) {
         final data = d.data();
         final marketId = data['marketId'] as String? ?? '';
         return {'id': d.id, ...data, 'marketLogoUrl': marketLogos[marketId] ?? ''};
@@ -150,8 +169,6 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         return {'id': d.id, ...data, 'marketLogoUrl': marketLogos[marketId] ?? ''};
       }),
     ];
-
-    if (active.isEmpty && upcoming.isEmpty) return 'Şu an aktif kampanya bulunmuyor.';
 
     String priceInfo(Map<String, dynamic> data) {
       final type = data['campaignType'] as String? ?? '';
@@ -173,9 +190,9 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
 
     final sb = StringBuffer();
 
-    if (active.isNotEmpty) {
+    if (interleavedActive.isNotEmpty) {
       sb.writeln('Aktif kampanyalar (ID|Ürün|Market|Kategori|Fiyat Bilgisi|Bitiş):\n');
-      for (final doc in active.take(1000)) {
+      for (final doc in interleavedActive.take(1000)) {
         final data = doc.data();
         final product = data['product'] as String? ?? '';
         final market = data['marketName'] as String? ?? '';
@@ -205,7 +222,8 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
   static const _synonymGroups = [
     ['tavuk', 'piliç', 'kanat', 'bonfile', 'but', 'göğüs', 'baget', 'hindi'],
     ['deterjan', 'çamaşır', 'temizlik', 'sabun', 'yumuşatıcı', 'çamaşır suyu', 'toz'],
-    ['meyve', 'sebze', 'elma', 'portakal', 'muz', 'salata'],
+    ['meyve', 'elma', 'portakal', 'muz', 'kiraz', 'şeftali', 'erik', 'üzüm', 'karpuz', 'kavun', 'çilek', 'armut'],
+    ['sebze', 'domates', 'salatalık', 'biber', 'patlıcan', 'kabak', 'ıspanak', 'marul', 'soğan', 'patates', 'havuç', 'brokoli'],
     ['süt', 'yoğurt', 'peynir', 'tereyağı', 'kaymak', 'ayran', 'kefir', 'süt ürün'],
     ['ekmek', 'pasta', 'kek', 'bisküvi', 'kraker', 'börek', 'poğaça', 'simit', 'tost'],
     ['şampuan', 'saç', 'krem', 'losyon', 'deodorant', 'parfüm', 'kozmetik'],
@@ -307,7 +325,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         },
         body: jsonEncode({
           'model': 'claude-haiku-4-5-20251001',
-          'max_tokens': 2048,
+          'max_tokens': 4096,
           'system': systemPrompt,
           'messages': [
             {'role': 'user', 'content': q}
@@ -350,6 +368,37 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
             matched = _activeCampaigns
                 .where((c) => ids.contains(c['id'] as String? ?? ''))
                 .toList();
+
+            // Sebze/meyve karışmasını önle: sorguya göre filtrele
+            final qLower = q.toLowerCase();
+            // Sebze aranınca filtrelenecek belirgin meyveler (limon/narenciye hariç)
+            const sadeceMeyve = ['karpuz','kavun','muz','kiraz','şeftali','erik','çilek','ananas','mango','üzüm'];
+            // Meyve aranınca filtrelenecek belirgin sebzeler
+            const sadeceSebze = ['domates','salatalık','biber','patlıcan','kabak','ıspanak','marul','soğan','patates','havuç','brokoli','bezelye','pırasa','enginar'];
+            final sorguSebze = qLower.contains('sebze') || sadeceSebze.any((s) => qLower.contains(s));
+            final sorguMeyve = qLower.contains('meyve') || sadeceMeyve.any((s) => qLower.contains(s));
+            if (sorguSebze && !sorguMeyve) {
+              matched = matched.where((c) {
+                final p = (c['product'] as String? ?? '').toLowerCase();
+                return !sadeceMeyve.any((m) => p.contains(m));
+              }).toList();
+              // Metinden de meyve isimlerini içeren cümleleri çıkar
+              for (final meyve in sadeceMeyve) {
+                reply = reply.replaceAll(
+                  RegExp('[^.!?]*$meyve[^.!?]*[.!?]', caseSensitive: false), '');
+              }
+            } else if (sorguMeyve && !sorguSebze) {
+              matched = matched.where((c) {
+                final p = (c['product'] as String? ?? '').toLowerCase();
+                return !sadeceSebze.any((s) => p.contains(s));
+              }).toList();
+              // Metinden de sebze isimlerini içeren cümleleri çıkar
+              for (final sebze in sadeceSebze) {
+                reply = reply.replaceAll(
+                  RegExp('[^.!?]*$sebze[^.!?]*[.!?]', caseSensitive: false), '');
+              }
+            }
+            reply = reply.replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
           } catch (_) {}
         }
 
@@ -404,16 +453,39 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       )));
     } finally {
       setState(() => _loading = false);
-      _scrollToBottom();
     }
   }
 
+  // Soru gönderilince: en alta in (kullanıcı mesajı görünsün)
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 100), () {
         if (_scrollController.hasClients) {
-          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
         }
+      });
+    });
+  }
+
+  // Cevap gelince: kullanıcı sorusunun başına scroll et
+  // (son kullanıcı mesajı = son 2 mesajdan önceki)
+  void _scrollToLastQuestion() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 150), () {
+        if (!_scrollController.hasClients) return;
+        final pos = _scrollController.position;
+        // Viewport yüksekliği kadar yukarı çık — cevabın tepesini göster
+        final target = (pos.maxScrollExtent - pos.viewportDimension * 0.85)
+            .clamp(0.0, pos.maxScrollExtent);
+        _scrollController.animateTo(
+          target,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOut,
+        );
       });
     });
   }
