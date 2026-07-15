@@ -335,6 +335,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
           'generationConfig': {
             'temperature': 0.7,
             'maxOutputTokens': 4096,
+            'thinkingConfig': {'thinkingBudget': 0},
           },
         }),
       ).timeout(const Duration(seconds: 30));
@@ -356,6 +357,16 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         reply = reply.replaceAllMapped(RegExp(r'\*\*([^*]+)\*\*'), (m) => m.group(1) ?? '');
         // 6. Fazla boş satırları temizle
         reply = reply.replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
+
+        // Bozuk/thinking cevap kontrolü: İngilizce düşünce metni sızdıysa temizle
+        final looksLikeThinking = reply.contains('Wait,') ||
+            reply.contains("Let's") ||
+            reply.contains('Selected IDs:') ||
+            reply.startsWith('->') ||
+            reply.startsWith('<');
+        if (looksLikeThinking || reply.length < 10) {
+          reply = 'Sorunuzu anlayamadım, lütfen tekrar sorar mısınız?';
+        }
 
         // AI cevabından KAMPANYALAR:[...] kısmını parse et
         final kampanyalarRegex = RegExp(r'KAMPANYALAR:\[([^\]]*)\]');
@@ -442,9 +453,8 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
           'timestamp': FieldValue.serverTimestamp(),
         });
         setState(() => _persistedMessages.add(_ChatMessage(
-          text: 'Bir hata oluştu, tekrar deneyin.',
+          text: 'Şu an cevap veremiyorum, lütfen sorunuzu tekrar sorar mısınız?',
           isUser: false,
-          isError: true,
         )));
       }
     } catch (e) {
@@ -455,9 +465,8 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         'timestamp': FieldValue.serverTimestamp(),
       });
       setState(() => _persistedMessages.add(_ChatMessage(
-        text: 'Bağlantı hatası oluştu, tekrar deneyin.',
+        text: 'Şu an cevap veremiyorum, lütfen sorunuzu tekrar sorar mısınız?',
         isUser: false,
-        isError: true,
       )));
     } finally {
       setState(() => _loading = false);
