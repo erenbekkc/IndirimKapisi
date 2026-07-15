@@ -56,8 +56,9 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
 
   Future<void> _loadApiKey() async {
     try {
-      final doc = await FirebaseFirestore.instance.collection('config').doc('ai').get();
-      _apiKey = doc.data()?['apiKey'] as String?;
+      final doc = await FirebaseFirestore.instance.collection('config').doc('gemini').get();
+      _apiKey = (doc.data()?['apiKey'] as String? ?? '').trim();
+      if (_apiKey!.isEmpty) _apiKey = null;
       final prompt = doc.data()?['systemPrompt'] as String?;
       if (prompt != null && prompt.isNotEmpty) _systemPrompt = prompt;
     } catch (e, s) {
@@ -317,25 +318,30 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
           + '\n\nKampanya verisi (ID|Ürün|Market|Kategori|Fiyat|Bitiş):\n$context';
 
       final resp = await http.post(
-        Uri.parse('https://api.anthropic.com/v1/messages'),
-        headers: {
-          'x-api-key': _apiKey!,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-        },
+        Uri.parse(
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${_apiKey!}',
+        ),
+        headers: {'content-type': 'application/json'},
         body: jsonEncode({
-          'model': 'claude-haiku-4-5-20251001',
-          'max_tokens': 4096,
-          'system': systemPrompt,
-          'messages': [
-            {'role': 'user', 'content': q}
+          'systemInstruction': {
+            'parts': [{'text': systemPrompt}],
+          },
+          'contents': [
+            {
+              'role': 'user',
+              'parts': [{'text': q}],
+            }
           ],
+          'generationConfig': {
+            'temperature': 0.7,
+            'maxOutputTokens': 4096,
+          },
         }),
       ).timeout(const Duration(seconds: 30));
 
       if (resp.statusCode == 200) {
         final body = jsonDecode(utf8.decode(resp.bodyBytes));
-        String reply = (body['content'] as List).first['text'] as String;
+        String reply = (body['candidates'] as List).first['content']['parts'][0]['text'] as String;
 
         // Markdown yapılarını temizle
         // 1. Markdown başlıkları (# ## ###)
@@ -414,6 +420,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
             'uid': uid,
             'question': q,
             'answer': reply,
+            'provider': 'gemini',
             'platform': Platform.isIOS ? 'ios' : 'android',
             'askedAt': FieldValue.serverTimestamp(),
           });
@@ -428,6 +435,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         }
         FirebaseFirestore.instance.collection('chatbot_logs').add({
           'type': 'api_error',
+          'provider': 'gemini',
           'statusCode': resp.statusCode,
           'errorMessage': errorDetail,
           'userQuery': q,
