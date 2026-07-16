@@ -83,6 +83,10 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         if (excludes != null) {
           _excludeFromGroupsDynamic = excludes.map((k, v) => MapEntry(k, List<String>.from(v as List)));
         }
+        final stops = data['stopWords'] as List<dynamic>?;
+        if (stops != null) {
+          _stopWordsDynamic = List<String>.from(stops);
+        }
       }
     } catch (e, s) {
       logError('ai_loadSearchConfig', e, s);
@@ -278,6 +282,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
   List<List<String>> _synonymGroupsDynamic = [];
   Map<String, List<String>> _phraseAliasesDynamic = {};
   Map<String, List<String>> _excludeFromGroupsDynamic = {};
+  List<String> _stopWordsDynamic = [];
 
   // Türkçe → ASCII: her iki tarafı da ortak forma indirgeyerek karşılaştır
   // "cay" ve "çay" ikisi de "cay"a döner → eşleşir
@@ -333,7 +338,12 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
   List<Map<String, dynamic>> _matchCampaignsLocally(String userQuery) {
     final query = userQuery.toLowerCase().trim();
     final queryAscii = _toAscii(query);
-    final queryWords = query.split(RegExp(r'\s+')).where((w) => w.length >= 2).toList();
+    // Stop word filtresi: "getir", "çeşitleri" gibi komut/dolgu kelimelerini çıkar
+    final stopAscii = _stopWordsDynamic.map(_toAscii).toSet();
+    final queryWords = query
+        .split(RegExp(r'\s+'))
+        .where((w) => w.length >= 2 && !stopAscii.contains(_toAscii(w)))
+        .toList();
 
     // İfade eş anlamlısı var mı? (örn: "sıvı yağ")
     List<String>? phraseAlts;
@@ -369,14 +379,6 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         continue;
       }
 
-      // Çok kelimeli sorgularda: TÜM orijinal kelimeler ürün adında eşleşmeli
-      if (queryWords.length > 1) {
-        final allMatch = queryWords
-            .where((t) => t.length >= 2)
-            .every((t) => _productContainsTerm(product, t));
-        if (!allMatch) continue;
-      }
-
       // Grup bazlı hariç tutma (Firestore config/search excludeFromGroups)
       bool excluded = false;
       for (final entry in _excludeFromGroupsDynamic.entries) {
@@ -406,24 +408,58 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
     return scored.take(20).toList();
   }
 
-  bool _isSimpleQuery(String q) {
-    final lower = q.toLowerCase().trim();
-    // 3'ten fazla kelime → karmaşık
-    final words = lower.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
-    if (words.length > 3) return false;
-    // Karmaşık niyet sinyalleri
-    const signals = [
-      'en ucuz', 'en pahalı', 'en iyi', 'en çok', 'en az',
-      'karşılaştır', 'hangisi', 'hangi market', 'hangi', 'nerede',
-      'bütçe', ' tl', 'öner', 'tavsiye', 'bugün', 'yarın', 'bu hafta',
-      'gelecek', 'kaç', 'ne kadar', 'nasıl', 'neden', 'niye',
-      'var mı', 'yok mu', 'var mi', 'yok mi', '?', 'daha iyi',
-      'fark', 'yerine', 'gibi', 'alternatif', 'öneri',
-    ];
-    for (final s in signals) {
-      if (lower.contains(s)) return false;
-    }
-    return true;
+  // 1-2 kelime → direkt lokal
+  // 3+ kelime → Gemini'ye niyet tespiti sor ("arama" mı "sohbet" mi)
+  static const _marketNames = [
+    'a101', 'bim', 'bimde', 'migros', 'şok', 'sok', 'carrefour',
+    'metro', 'file', 'hakmar', 'diyos', 'onur', 'macro', 'kiler',
+  ];
+
+  // 1-2 kelime → lokal (true)
+  // 3+ kelime + market adı → Gemini (false)
+  // 3+ kelime, market yok → niyet tespiti
+  Future<bool> _isSimpleQuery(String q) async {
+    final lower = q.toLowerCase();
+    final words = lower.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+
+    if (words.length <= 2) return true; // kesin arama
+
+    // Market adı varsa Gemini'ye git
+    if (_marketNames.any((m) => lower.contains(m))) return false;
+
+    if (_apiKey == null) return true;
+    try {
+      final resp = await http.post(
+        Uri.parse(
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${_apiKey!}',
+        ),
+        headers: {'content-type': 'application/json'},
+        body: jsonEncode({
+          'contents': [
+            {
+              'parts': [
+                {
+                  'text': 'Kullanıcı bir alışveriş asistanına şunu yazdı: "$q"\n\n'
+                      'Bu mesaj:\n'
+                      '- Bir ürün veya kategori araması ise "arama" yaz\n'
+                      '- Fiyat sorusu, öneri, karşılaştırma, bütçe veya sohbet ise "sohbet" yaz\n\n'
+                      'Sadece tek kelime yaz: arama veya sohbet',
+                }
+              ]
+            }
+          ],
+          'generationConfig': {'temperature': 0, 'maxOutputTokens': 8},
+        }),
+      ).timeout(const Duration(seconds: 5));
+
+      if (resp.statusCode == 200) {
+        final body = jsonDecode(utf8.decode(resp.bodyBytes));
+        final text = ((body['candidates'] as List).first['content']['parts'] as List)
+            .first['text'] as String;
+        return text.trim().toLowerCase().contains('arama');
+      }
+    } catch (_) {}
+    return true; // hata olursa lokal ara
   }
 
   Future<void> _send(String text) async {
@@ -454,7 +490,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       await _loadAllCampaigns();
 
       // Basit sorgularda Gemini'ye gitme — yerel filtrele
-      if (_isSimpleQuery(q)) {
+      if (await _isSimpleQuery(q)) {
         final localMatches = _matchCampaignsLocally(q);
         final qCap = q[0].toUpperCase() + q.substring(1);
         final localReply = localMatches.isNotEmpty
@@ -1034,11 +1070,23 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
                         Text(market, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                         if (isUpcoming && startDate != null) ...[
                           Text('  ·  ', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
-                          Text('Başlangıç: ${_dateFmt.format(startDate)}',
+                          Text('${_dateFmt.format(startDate)}',
                               style: const TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.w500)),
+                          if (endDate != null) ...[
+                            Text(' – ', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+                            Text('${_dateFmt.format(endDate)}',
+                                style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                          ],
                         ] else if (endDate != null) ...[
-                          Text('  ·  ', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
-                          Text('Bitiş: ${_dateFmt.format(endDate)}',
+                          if (startDate != null) ...[
+                            Text('  ·  ', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+                            Text('${_dateFmt.format(startDate)}',
+                                style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                            Text(' – ', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+                          ] else ...[
+                            Text('  ·  ', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+                          ],
+                          Text('${_dateFmt.format(endDate)}',
                               style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                         ],
                       ],

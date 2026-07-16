@@ -511,7 +511,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text('$count kampanya bulundu',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                    style: const TextStyle(fontSize: 12, color: Colors.black87)),
               ],
             ),
           ),
