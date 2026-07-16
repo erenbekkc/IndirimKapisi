@@ -56,13 +56,36 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
 
   Future<void> _loadApiKey() async {
     try {
-      final doc = await FirebaseFirestore.instance.collection('config').doc('gemini').get();
-      _apiKey = (doc.data()?['apiKey'] as String? ?? '').trim();
+      final geminiDoc = await FirebaseFirestore.instance.collection('config').doc('gemini').get();
+      _apiKey = (geminiDoc.data()?['apiKey'] as String? ?? '').trim();
       if (_apiKey!.isEmpty) _apiKey = null;
-      final prompt = doc.data()?['systemPrompt'] as String?;
+      final prompt = geminiDoc.data()?['systemPrompt'] as String?;
       if (prompt != null && prompt.isNotEmpty) _systemPrompt = prompt;
     } catch (e, s) {
       logError('ai_loadApiKey', e, s);
+    }
+    try {
+      final searchDoc = await FirebaseFirestore.instance.collection('config').doc('search').get();
+      final data = searchDoc.data();
+      if (data != null) {
+        // synonymGroups map olarak saklanıyor: {"g0": [...], "g1": [...]}
+        final groupsMap = data['synonymGroups'] as Map<String, dynamic>?;
+        if (groupsMap != null) {
+          _synonymGroupsDynamic = groupsMap.values
+              .map((g) => List<String>.from(g as List))
+              .toList();
+        }
+        final aliases = data['phraseAliases'] as Map<String, dynamic>?;
+        if (aliases != null) {
+          _phraseAliasesDynamic = aliases.map((k, v) => MapEntry(k, List<String>.from(v as List)));
+        }
+        final excludes = data['excludeFromGroups'] as Map<String, dynamic>?;
+        if (excludes != null) {
+          _excludeFromGroupsDynamic = excludes.map((k, v) => MapEntry(k, List<String>.from(v as List)));
+        }
+      }
+    } catch (e, s) {
+      logError('ai_loadSearchConfig', e, s);
     }
   }
 
@@ -70,11 +93,11 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
   final _dateFmt = DateFormat('dd MMM', 'tr_TR');
 
   final List<String> _suggestions = [
-    '200 TL bütçem var ne alayım?',
-    'Bu hafta deterjan kampanyası var mı?',
-    'Hangi market bu hafta daha avantajlı?',
-    'Bugün biten kampanyalar neler?',
-    'En yüksek indirimli ürünler hangileri?',
+    'Peynir',
+    'Deterjan',
+    'Tavuk',
+    'Zeytinyağı',
+    'Şampuan',
   ];
 
   @override
@@ -102,11 +125,11 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
     super.dispose();
   }
 
-  Future<String> _fetchCampaignContext() async {
+  // Tüm kampanyaları Firestore'dan çekip _activeCampaigns'e yükler (kart gösterimi için)
+  Future<void> _loadAllCampaigns() async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    // Market logolarını çek
     final marketsSnap = await FirebaseFirestore.instance.collection('markets').get();
     final marketLogos = <String, String>{};
     for (final m in marketsSnap.docs) {
@@ -129,7 +152,6 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       if (endDate == null) continue;
       final endDay = DateTime(endDate.year, endDate.month, endDate.day);
       if (endDay.isBefore(today)) continue;
-      // Gün bazında karşılaştır: bugün başlayan kampanya aktif sayılır
       final startDay = startDate != null
           ? DateTime(startDate.year, startDate.month, startDate.day)
           : null;
@@ -140,9 +162,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       }
     }
 
-    if (active.isEmpty && upcoming.isEmpty) return 'Şu an aktif kampanya bulunmuyor.';
-
-    // Marketler arası dengeli sıralama: A101, Migros, BİM, ŞOK dönüşümlü gelsin
+    // Marketler arası dengeli sıralama
     final byMarket = <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
     for (final d in active) {
       final market = (d.data()['marketName'] as String? ?? 'Diğer').toLowerCase();
@@ -159,119 +179,51 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
     }
 
     _activeCampaigns = [
-      ...interleavedActive.take(1000).map((d) {
+      ...interleavedActive.map((d) {
         final data = d.data();
         final marketId = data['marketId'] as String? ?? '';
         return {'id': d.id, ...data, 'marketLogoUrl': marketLogos[marketId] ?? ''};
       }),
-      ...upcoming.take(50).map((d) {
+      ...upcoming.map((d) {
         final data = d.data();
         final marketId = data['marketId'] as String? ?? '';
-        return {'id': d.id, ...data, 'marketLogoUrl': marketLogos[marketId] ?? ''};
+        return {'id': d.id, ...data, 'marketLogoUrl': marketLogos[marketId] ?? '', '_upcoming': true};
       }),
     ];
-
-    String priceInfo(Map<String, dynamic> data) {
-      final type = data['campaignType'] as String? ?? '';
-      if (type == 'priceDiscount') {
-        final oldP = (data['oldPrice'] as num?)?.toDouble() ?? 0;
-        final newP = (data['newPrice'] as num?)?.toDouble() ?? 0;
-        final pct = oldP > 0 ? ((oldP - newP) / oldP * 100).round() : 0;
-        return '${_priceFmt.format(oldP)} TL → ${_priceFmt.format(newP)} TL (%$pct indirim)';
-      } else if (type == 'buyOneGetOne') {
-        final price = (data['productPrice'] as num?)?.toDouble() ?? 0;
-        return '1 alana 1 bedava (${_priceFmt.format(price)} TL)';
-      } else if (type == 'secondDiscount') {
-        final rate = (data['discountRate'] as num?)?.toInt() ?? 0;
-        final price = (data['productPrice'] as num?)?.toDouble() ?? 0;
-        return '2. üründe %$rate indirim (${_priceFmt.format(price)} TL)';
-      }
-      return '';
-    }
-
-    final sb = StringBuffer();
-
-    if (interleavedActive.isNotEmpty) {
-      sb.writeln('Aktif kampanyalar (ID|Ürün|Market|Kategori|Fiyat Bilgisi|Bitiş):\n');
-      for (final doc in interleavedActive.take(1000)) {
-        final data = doc.data();
-        final product = data['product'] as String? ?? '';
-        final market = data['marketName'] as String? ?? '';
-        final category = data['categoryName'] as String? ?? '';
-        final endDate = (data['endDate'] as Timestamp?)?.toDate();
-        sb.writeln('${doc.id}|$product|$market|$category|${priceInfo(data)}|${endDate != null ? _dateFmt.format(endDate) : "-"}');
-      }
-    }
-
-    if (upcoming.isNotEmpty) {
-      sb.writeln('\nYakında başlayacak kampanyalar (ID|Ürün|Market|Kategori|Fiyat Bilgisi|Başlangıç|Bitiş):\n');
-      for (final doc in upcoming.take(50)) {
-        final data = doc.data();
-        final product = data['product'] as String? ?? '';
-        final market = data['marketName'] as String? ?? '';
-        final category = data['categoryName'] as String? ?? '';
-        final startDate = (data['startDate'] as Timestamp?)?.toDate();
-        final endDate = (data['endDate'] as Timestamp?)?.toDate();
-        sb.writeln('${doc.id}|$product|$market|$category|${priceInfo(data)}|${startDate != null ? _dateFmt.format(startDate) : "-"}|${endDate != null ? _dateFmt.format(endDate) : "-"}');
-      }
-    }
-
-    return sb.toString();
   }
 
-  // Eş anlamlı kelime grupları
-  static const _synonymGroups = [
-    ['tavuk', 'piliç', 'kanat', 'bonfile', 'but', 'göğüs', 'baget', 'hindi'],
-    ['deterjan', 'çamaşır', 'temizlik', 'sabun', 'yumuşatıcı', 'çamaşır suyu', 'toz'],
-    ['meyve', 'elma', 'portakal', 'muz', 'kiraz', 'şeftali', 'erik', 'üzüm', 'karpuz', 'kavun', 'çilek', 'armut'],
-    ['sebze', 'domates', 'salatalık', 'biber', 'patlıcan', 'kabak', 'ıspanak', 'marul', 'soğan', 'patates', 'havuç', 'brokoli'],
-    ['süt', 'yoğurt', 'peynir', 'tereyağı', 'kaymak', 'ayran', 'kefir', 'süt ürün'],
-    ['ekmek', 'pasta', 'kek', 'bisküvi', 'kraker', 'börek', 'poğaça', 'simit', 'tost'],
-    ['şampuan', 'saç', 'krem', 'losyon', 'deodorant', 'parfüm', 'kozmetik'],
-    ['kahve', 'çay', 'nescafe', 'türk kahvesi', 'bitki çayı'],
-    ['makarna', 'pirinç', 'bulgur', 'un', 'şeker', 'tuz', 'yağ', 'zeytinyağı'],
-    ['bebek', 'bez', 'mama', 'ıslak mendil', 'biberon'],
-    ['et', 'kıyma', 'köfte', 'sucuk', 'sosis', 'salam', 'jambon'],
-    ['balık', 'deniz ürün', 'ton balığı', 'somon', 'sardalye'],
-    ['su', 'maden suyu', 'içecek', 'meşrubat', 'kola', 'ayran', 'meyve suyu'],
-    ['atıştırmalık', 'çikolata', 'gofret', 'cips', 'fındık', 'fıstık', 'kuruyemiş'],
-    ['kahvaltı', 'kahvaltılık', 'peynir', 'zeytin', 'yumurta', 'domates', 'salatalık',
-     'reçel', 'bal', 'marmelat', 'nutella', 'çikolatalı krema', 'tereyağı', 'kaymak',
-     'ekmek', 'tost', 'pide', 'açma', 'poğaça', 'simit', 'tahini', 'pekmez'],
-  ];
+  // Kullanıcı sorgusuna göre filtrele, Gemini'ye gönderilecek max 25 kampanya döndür
+  String _buildFilteredContext(String userQuery) {
+    if (_activeCampaigns.isEmpty) return 'Şu an aktif kampanya bulunmuyor.';
 
-  List<Map<String, dynamic>> _matchCampaignsLocally(String userQuery) {
     final combined = userQuery.toLowerCase();
-
-    // Sorgudaki kelimelerle eş anlamlı genişletme
     final searchTerms = <String>{};
     for (final word in combined.split(RegExp(r'\s+'))) {
-      if (word.length < 3) continue;
+      if (word.length < 2) continue;
       searchTerms.add(word);
-      for (final group in _synonymGroups) {
-        if (group.any((s) => word.contains(s) || s.contains(word))) {
+      final wordAscii = _toAscii(word);
+      for (final group in _synonymGroupsDynamic) {
+        if (group.any((g) => _toAscii(g) == wordAscii)) {
           searchTerms.addAll(group);
           break;
         }
       }
     }
 
+    // Skora göre sırala
     final scored = <Map<String, dynamic>>[];
     for (final c in _activeCampaigns) {
       final product = (c['product'] as String? ?? '').toLowerCase();
       final category = (c['categoryName'] as String? ?? '').toLowerCase();
       final market = (c['marketName'] as String? ?? '').toLowerCase();
       final searchable = '$product $category $market';
-
       int score = 0;
       for (final term in searchTerms) {
-        if (term.length < 3) continue;
-        if (searchable.contains(term)) {
-          score++;
-        } else {
-          // Türkçe ek kontrolü: "migrostaki" → "migros" gibi
+        if (term.length < 2) continue;
+        if (searchable.contains(term)) score += 2;
+        else {
           for (final w in searchable.split(RegExp(r'\s+'))) {
-            if (w.length >= 3 && term.startsWith(w)) {
+            if (w.length >= 2 && (term.startsWith(w) || w.startsWith(term))) {
               score++;
               break;
             }
@@ -280,9 +232,198 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       }
       if (score > 0) scored.add({...c, '_score': score});
     }
+    scored.sort((a, b) => (b['_score'] as int).compareTo(a['_score'] as int));
+
+    final toSend = scored.isNotEmpty
+        ? scored.take(25).toList()
+        : _activeCampaigns.take(5).toList();
+
+    String priceInfo(Map<String, dynamic> data) {
+      final type = data['campaignType'] as String? ?? '';
+      if (type == 'priceDiscount') {
+        final newP = (data['newPrice'] as num?)?.toDouble() ?? 0;
+        final oldP = (data['oldPrice'] as num?)?.toDouble() ?? 0;
+        final pct = oldP > 0 ? ((oldP - newP) / oldP * 100).round() : 0;
+        return '${_priceFmt.format(newP)} TL(%$pct)';
+      } else if (type == 'buyOneGetOne') {
+        return '1al1bedava';
+      } else if (type == 'secondDiscount') {
+        final rate = (data['discountRate'] as num?)?.toInt() ?? 0;
+        return '2.ürün%$rate';
+      }
+      return '';
+    }
+
+    final sb = StringBuffer();
+    final activeItems = toSend.where((c) => c['_upcoming'] != true).toList();
+    final upcomingItems = toSend.where((c) => c['_upcoming'] == true).toList();
+
+    if (activeItems.isNotEmpty) {
+      sb.writeln('Kampanyalar(ID|Ürün|Market|Fiyat):');
+      for (final c in activeItems) {
+        sb.writeln('${c['id']}|${c['product'] ?? ''}|${c['marketName'] ?? ''}|${priceInfo(c)}');
+      }
+    }
+    if (upcomingItems.isNotEmpty) {
+      sb.writeln('Yakında(ID|Ürün|Market|Fiyat|Başlangıç):');
+      for (final c in upcomingItems) {
+        final startDate = (c['startDate'] as Timestamp?)?.toDate();
+        sb.writeln('${c['id']}|${c['product'] ?? ''}|${c['marketName'] ?? ''}|${priceInfo(c)}|${startDate != null ? _dateFmt.format(startDate) : '-'}');
+      }
+    }
+    return sb.toString();
+  }
+
+// Tümü Firestore config/search'ten yüklenir — koda kural gömme
+  List<List<String>> _synonymGroupsDynamic = [];
+  Map<String, List<String>> _phraseAliasesDynamic = {};
+  Map<String, List<String>> _excludeFromGroupsDynamic = {};
+
+  // Türkçe → ASCII: her iki tarafı da ortak forma indirgeyerek karşılaştır
+  // "cay" ve "çay" ikisi de "cay"a döner → eşleşir
+  // "sut" ve "süt" ikisi de "sut"a döner → eşleşir
+  static String _toAscii(String s) => s
+      .replaceAll('ç', 'c')
+      .replaceAll('ş', 's')
+      .replaceAll('ğ', 'g')
+      .replaceAll('ü', 'u')
+      .replaceAll('ö', 'o')
+      .replaceAll('ı', 'i')
+      .replaceAll('İ', 'i');
+
+  // Geçerli Türkçe ekler — ASCII formunda
+  static const _validSuffixesAscii = [
+    '', 'lar', 'ler',
+    'i', 'u', 'a', 'e',
+    'da', 'de', 'ta', 'te',
+    'dan', 'den', 'tan', 'ten',
+    'in', 'un',
+    'im', 'um',
+    'si', 'su',
+    'lari', 'leri',
+    'lara', 'lere',
+    'lardan', 'lerden',
+    'larda', 'lerde',
+  ];
+
+  // Bir kelimenin geçerli Türkçe ek alarak term'e eşleşip eşleşmediği
+  // Her ikisi de ASCII'ye çevrilerek karşılaştırılır
+  bool _stemMatch(String word, String term) {
+    final w = _toAscii(word);
+    final t = _toAscii(term);
+    if (!w.startsWith(t)) return false;
+    final suffix = w.substring(t.length);
+    return _validSuffixesAscii.contains(suffix);
+  }
+
+  // Ürün adındaki herhangi bir kelime, sorgu terimini stem olarak içeriyor mu?
+  bool _productContainsTerm(String product, String term) {
+    for (final w in product.split(RegExp(r'[\s\-\/,()+]+'))) {
+      if (_stemMatch(w, term)) return true;
+    }
+    return false;
+  }
+
+  // Çok kelimeli bir ifadenin ürün adında tüm kelimelerinin eşleşip eşleşmediği
+  bool _phraseMatchesProduct(String product, String phrase) {
+    final words = phrase.split(RegExp(r'\s+')).where((w) => w.length >= 2).toList();
+    return words.every((w) => _productContainsTerm(product, w));
+  }
+
+  List<Map<String, dynamic>> _matchCampaignsLocally(String userQuery) {
+    final query = userQuery.toLowerCase().trim();
+    final queryAscii = _toAscii(query);
+    final queryWords = query.split(RegExp(r'\s+')).where((w) => w.length >= 2).toList();
+
+    // İfade eş anlamlısı var mı? (örn: "sıvı yağ")
+    List<String>? phraseAlts;
+    for (final entry in _phraseAliasesDynamic.entries) {
+      if (_toAscii(entry.key) == queryAscii) {
+        phraseAlts = entry.value;
+        break;
+      }
+    }
+
+    // Tek kelime synonym genişletmesi — ASCII normalize ederek karşılaştır
+    final allTerms = <String>{...queryWords};
+    for (final word in queryWords) {
+      final wordAscii = _toAscii(word);
+      for (final group in _synonymGroupsDynamic) {
+        if (group.any((g) => _toAscii(g) == wordAscii)) {
+          allTerms.addAll(group);
+          break;
+        }
+      }
+    }
+
+    final scored = <Map<String, dynamic>>[];
+    for (final c in _activeCampaigns) {
+      final product = (c['product'] as String? ?? '').toLowerCase();
+      final market = (c['marketName'] as String? ?? '').toLowerCase();
+
+      // İfade eş anlamlısı varsa: alternatiflerden herhangi biri eşleşmeli
+      if (phraseAlts != null) {
+        final hit = phraseAlts.any((alt) => _phraseMatchesProduct(product, alt));
+        if (!hit) continue;
+        scored.add({...c, '_score': 1});
+        continue;
+      }
+
+      // Çok kelimeli sorgularda: TÜM orijinal kelimeler ürün adında eşleşmeli
+      if (queryWords.length > 1) {
+        final allMatch = queryWords
+            .where((t) => t.length >= 2)
+            .every((t) => _productContainsTerm(product, t));
+        if (!allMatch) continue;
+      }
+
+      // Grup bazlı hariç tutma (Firestore config/search excludeFromGroups)
+      bool excluded = false;
+      for (final entry in _excludeFromGroupsDynamic.entries) {
+        if (allTerms.contains(entry.key)) {
+          if (entry.value.any((w) => product.contains(w))) {
+            excluded = true;
+            break;
+          }
+        }
+      }
+      if (excluded) continue;
+
+      // Skor hesapla — çok kelimeli synonym'ler için phraseMatch kullan
+      int score = 0;
+      for (final term in allTerms) {
+        final isPhrase = term.contains(' ');
+        final hit = isPhrase
+            ? _phraseMatchesProduct(product, term) || _phraseMatchesProduct(market, term)
+            : _productContainsTerm(product, term) || _productContainsTerm(market, term);
+        if (hit) score++;
+      }
+
+      if (score > 0) scored.add({...c, '_score': score});
+    }
 
     scored.sort((a, b) => (b['_score'] as int).compareTo(a['_score'] as int));
-    return scored.take(5).toList();
+    return scored.take(20).toList();
+  }
+
+  bool _isSimpleQuery(String q) {
+    final lower = q.toLowerCase().trim();
+    // 3'ten fazla kelime → karmaşık
+    final words = lower.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    if (words.length > 3) return false;
+    // Karmaşık niyet sinyalleri
+    const signals = [
+      'en ucuz', 'en pahalı', 'en iyi', 'en çok', 'en az',
+      'karşılaştır', 'hangisi', 'hangi market', 'hangi', 'nerede',
+      'bütçe', ' tl', 'öner', 'tavsiye', 'bugün', 'yarın', 'bu hafta',
+      'gelecek', 'kaç', 'ne kadar', 'nasıl', 'neden', 'niye',
+      'var mı', 'yok mu', 'var mi', 'yok mi', '?', 'daha iyi',
+      'fark', 'yerine', 'gibi', 'alternatif', 'öneri',
+    ];
+    for (final s in signals) {
+      if (lower.contains(s)) return false;
+    }
+    return true;
   }
 
   Future<void> _send(String text) async {
@@ -310,8 +451,35 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         return;
       }
 
-      final context = await _fetchCampaignContext();
+      await _loadAllCampaigns();
+
+      // Basit sorgularda Gemini'ye gitme — yerel filtrele
+      if (_isSimpleQuery(q)) {
+        final localMatches = _matchCampaignsLocally(q);
+        final qCap = q[0].toUpperCase() + q.substring(1);
+        final localReply = localMatches.isNotEmpty
+            ? '$qCap için ${localMatches.length} kampanya buldum, aşağıda görebilirsin. Kartlardaki ❤️ ikonuna dokunarak favorilerinize ekleyin, indirimleri kaçırmayın!'
+            : 'Şu an "$q" için aktif kampanya bulamadım.';
+        setState(() => _persistedMessages.add(_ChatMessage(
+          text: localReply,
+          isUser: false,
+          matchedCampaigns: localMatches,
+        )));
+        unawaited(getOrCreateUserId().then((uid) {
+          FirebaseFirestore.instance.collection('ai-logs').add({
+            'uid': uid,
+            'question': q,
+            'answer': localReply,
+            'provider': 'local',
+            'platform': Platform.isIOS ? 'ios' : 'android',
+            'askedAt': FieldValue.serverTimestamp(),
+          });
+        }));
+        return;
+      }
+
       final todayStr = DateFormat('d MMMM', 'tr_TR').format(DateTime.now());
+      final context = _buildFilteredContext(q);
 
       final template = _systemPrompt ?? _kDefaultSystemPrompt;
       final systemPrompt = template.replaceAll('{TODAY}', todayStr)
@@ -319,7 +487,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
 
       final resp = await http.post(
         Uri.parse(
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${_apiKey!}',
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${_apiKey!}',
         ),
         headers: {'content-type': 'application/json'},
         body: jsonEncode({
@@ -334,15 +502,19 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
           ],
           'generationConfig': {
             'temperature': 0.7,
-            'maxOutputTokens': 4096,
-            'thinkingConfig': {'thinkingBudget': 0},
+            'maxOutputTokens': 512,
           },
         }),
       ).timeout(const Duration(seconds: 30));
 
       if (resp.statusCode == 200) {
         final body = jsonDecode(utf8.decode(resp.bodyBytes));
-        String reply = (body['candidates'] as List).first['content']['parts'][0]['text'] as String;
+        final parts = ((body['candidates'] as List).first['content']['parts'] as List);
+        // thought:true olan thinking parts'ları atla, sadece gerçek cevabı al
+        final textParts = parts.where((p) => p['thought'] != true && p['text'] != null);
+        String reply = textParts.isNotEmpty
+            ? textParts.map((p) => p['text'] as String).join()
+            : (parts.first['text'] as String? ?? '');
 
         // Markdown yapılarını temizle
         // 1. Markdown başlıkları (# ## ###)
@@ -357,16 +529,6 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         reply = reply.replaceAllMapped(RegExp(r'\*\*([^*]+)\*\*'), (m) => m.group(1) ?? '');
         // 6. Fazla boş satırları temizle
         reply = reply.replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
-
-        // Bozuk/thinking cevap kontrolü: İngilizce düşünce metni sızdıysa temizle
-        final looksLikeThinking = reply.contains('Wait,') ||
-            reply.contains("Let's") ||
-            reply.contains('Selected IDs:') ||
-            reply.startsWith('->') ||
-            reply.startsWith('<');
-        if (looksLikeThinking || reply.length < 10) {
-          reply = 'Sorunuzu anlayamadım, lütfen tekrar sorar mısınız?';
-        }
 
         // AI cevabından KAMPANYALAR:[...] kısmını parse et
         final kampanyalarRegex = RegExp(r'KAMPANYALAR:\[([^\]]*)\]');
@@ -772,6 +934,8 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
     final type = c['campaignType'] as String? ?? '';
     final imageUrl = c['productImageUrl'] as String?;
     final endDate = (c['endDate'] as Timestamp?)?.toDate();
+    final startDate = (c['startDate'] as Timestamp?)?.toDate();
+    final isUpcoming = c['_upcoming'] == true;
 
     Widget? priceWidget;
     if (type == 'priceDiscount') {
@@ -868,7 +1032,11 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
                           Icon(Icons.store, size: 12, color: Colors.grey.shade400),
                         const SizedBox(width: 4),
                         Text(market, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-                        if (endDate != null) ...[
+                        if (isUpcoming && startDate != null) ...[
+                          Text('  ·  ', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+                          Text('Başlangıç: ${_dateFmt.format(startDate)}',
+                              style: const TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.w500)),
+                        ] else if (endDate != null) ...[
                           Text('  ·  ', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
                           Text('Bitiş: ${_dateFmt.format(endDate)}',
                               style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
