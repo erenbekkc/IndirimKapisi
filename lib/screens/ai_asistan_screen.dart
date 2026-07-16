@@ -321,10 +321,28 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
     return _validSuffixesAscii.contains(suffix);
   }
 
+  // Sorgu teriminden ekleri düş, kök formu döndür
+  // "şampuanlar" → "şampuan", "yoğurtları" → "yogurt"
+  String _stripSuffix(String term) {
+    final t = _toAscii(term);
+    // Uzun ekten kısaya sıralı dene
+    final sorted = [..._validSuffixesAscii]
+      ..sort((a, b) => b.length.compareTo(a.length));
+    for (final suf in sorted) {
+      if (suf.isEmpty) continue;
+      if (t.endsWith(suf) && t.length - suf.length >= 3) {
+        return t.substring(0, t.length - suf.length);
+      }
+    }
+    return t;
+  }
+
   // Ürün adındaki herhangi bir kelime, sorgu terimini stem olarak içeriyor mu?
   bool _productContainsTerm(String product, String term) {
+    final termRoot = _stripSuffix(term); // "şampuanlar" → "sampuan"
     for (final w in product.split(RegExp(r'[\s\-\/,()+]+'))) {
-      if (_stemMatch(w, term)) return true;
+      if (_stemMatch(w, term)) return true;       // ürün kelimesi termin köküyle başlıyor mu
+      if (_stemMatch(w, termRoot)) return true;   // ürün kelimesi, sorgunun kökünden türüyor mu
     }
     return false;
   }
@@ -345,21 +363,24 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         .where((w) => w.length >= 2 && !stopAscii.contains(_toAscii(w)))
         .toList();
 
-    // İfade eş anlamlısı var mı? (örn: "sıvı yağ")
+    // İfade eş anlamlısı var mı? (örn: "sıvı yağ", "kahvaltılar")
+    final queryRoot = _stripSuffix(query);
     List<String>? phraseAlts;
     for (final entry in _phraseAliasesDynamic.entries) {
-      if (_toAscii(entry.key) == queryAscii) {
+      final keyAscii = _toAscii(entry.key);
+      if (keyAscii == queryAscii || keyAscii == queryRoot) {
         phraseAlts = entry.value;
         break;
       }
     }
 
-    // Tek kelime synonym genişletmesi — ASCII normalize ederek karşılaştır
+    // Tek kelime synonym genişletmesi — ASCII normalize + ek düşürme ile karşılaştır
     final allTerms = <String>{...queryWords};
     for (final word in queryWords) {
       final wordAscii = _toAscii(word);
+      final wordRoot  = _stripSuffix(word); // "tavuklar" → "tavuk"
       for (final group in _synonymGroupsDynamic) {
-        if (group.any((g) => _toAscii(g) == wordAscii)) {
+        if (group.any((g) => _toAscii(g) == wordAscii || _toAscii(g) == wordRoot)) {
           allTerms.addAll(group);
           break;
         }
