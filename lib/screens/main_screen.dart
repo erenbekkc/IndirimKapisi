@@ -7,6 +7,8 @@ import 'profil_screen.dart';
 import 'hakkinda_screen.dart';
 import 'ai_asistan_screen.dart';
 import '../session_tracker.dart';
+import '../services/announcement_service.dart';
+import '../widgets/announcement_dialog.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -22,6 +24,26 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAnnouncement());
+  }
+
+  Future<void> _checkAnnouncement() async {
+    final ann = await AnnouncementService.fetchIfShouldShow();
+    if (ann == null || !mounted) return;
+    AnnouncementService.logEvent(ann, 'shown');
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AnnouncementDialog(
+        data: ann,
+        onCtaTap: () async {
+          AnnouncementService.logEvent(ann, 'cta_tapped');
+          if (ann.showOnce) await AnnouncementService.markAsSeen(ann.id);
+          // ignore: use_build_context_synchronously
+          Navigator.of(context).pop();
+        },
+      ),
+    );
   }
 
   @override

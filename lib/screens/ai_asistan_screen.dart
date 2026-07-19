@@ -34,6 +34,22 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
   String? _apiKey;
   String? _systemPrompt;
 
+  List<String> _foundMessageTemplates = [];
+  List<String> _notFoundMessages = [];
+  List<String> _suggestions = [
+    'Peynir',
+    'Deterjan',
+    'Tavuk',
+    'Zeytinyağı',
+    'Şampuan',
+  ];
+  String _welcomeMessage =
+      'Merhaba! 👋 Ben İndirim ve Fırsat Asistanıyım.\n\nMevcut kampanyalar hakkında her şeyi sorabilirsin. Bütçene göre öneri, market karşılaştırması, kategori bazlı arama yapabilirim!';
+  List<String> _marketNamesDynamic = [
+    'a101', 'bim', 'bimde', 'migros', 'şok', 'sok', 'carrefour',
+    'metro', 'file', 'hakmar', 'diyos', 'onur', 'macro', 'kiler',
+  ];
+
   static const _kDefaultSystemPrompt =
       'Sen İndirim Kapısı uygulamasının alışveriş asistanısın.\n'
       'Bugünün tarihi: {TODAY}. Tarih sorarlarsa veya "bugün biten" gibi sorgularda bu tarihi kullan.\n'
@@ -65,6 +81,34 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       logError('ai_loadApiKey', e, s);
     }
     try {
+      final chatbotDoc = await FirebaseFirestore.instance.collection('config').doc('chatbot').get();
+      final cb = chatbotDoc.data();
+      if (cb != null) {
+        final found = cb['foundMessages'] as List<dynamic>?;
+        if (found != null && found.isNotEmpty) {
+          _foundMessageTemplates = List<String>.from(found);
+        }
+        final notFound = cb['notFoundMessages'] as List<dynamic>?;
+        if (notFound != null && notFound.isNotEmpty) {
+          _notFoundMessages = List<String>.from(notFound);
+        }
+        final sugg = cb['suggestions'] as List<dynamic>?;
+        if (sugg != null && sugg.isNotEmpty) {
+          setState(() => _suggestions = List<String>.from(sugg));
+        }
+        final welcome = cb['welcomeMessage'] as String?;
+        if (welcome != null && welcome.isNotEmpty) {
+          _welcomeMessage = welcome;
+        }
+        final markets = cb['marketNames'] as List<dynamic>?;
+        if (markets != null && markets.isNotEmpty) {
+          _marketNamesDynamic = List<String>.from(markets);
+        }
+      }
+    } catch (e, s) {
+      logError('ai_loadChatbotConfig', e, s);
+    }
+    try {
       final searchDoc = await FirebaseFirestore.instance.collection('config').doc('search').get();
       final data = searchDoc.data();
       if (data != null) {
@@ -87,6 +131,26 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         if (stops != null) {
           _stopWordsDynamic = List<String>.from(stops);
         }
+        final ctAliases = data['campaignTypeAliases'] as Map<String, dynamic>?;
+        if (ctAliases != null) {
+          _campaignTypeAliasesDynamic = ctAliases.map(
+            (k, v) => MapEntry(k, List<String>.from(v as List)),
+          );
+        }
+        final qExclude = data['queryExcludeMap'] as Map<String, dynamic>?;
+        if (qExclude != null) {
+          _queryExcludeMapDynamic = qExclude.map(
+            (k, v) => MapEntry(k, List<String>.from(v as List)),
+          );
+        }
+        final fruits = data['fruitList'] as List<dynamic>?;
+        if (fruits != null && fruits.isNotEmpty) {
+          _fruitListDynamic = List<String>.from(fruits);
+        }
+        final vegs = data['vegetableList'] as List<dynamic>?;
+        if (vegs != null && vegs.isNotEmpty) {
+          _vegetableListDynamic = List<String>.from(vegs);
+        }
       }
     } catch (e, s) {
       logError('ai_loadSearchConfig', e, s);
@@ -96,20 +160,12 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
   final _priceFmt = NumberFormat('#,##0.00', 'tr_TR');
   final _dateFmt = DateFormat('dd MMM', 'tr_TR');
 
-  final List<String> _suggestions = [
-    'Peynir',
-    'Deterjan',
-    'Tavuk',
-    'Zeytinyağı',
-    'Şampuan',
-  ];
-
   @override
   void initState() {
     super.initState();
     if (_persistedMessages.isEmpty) {
       _persistedMessages.add(_ChatMessage(
-        text: 'Merhaba! 👋 Ben İndirim ve Fırsat Asistanıyım.\n\nMevcut kampanyalar hakkında her şeyi sorabilirsin. Bütçene göre öneri, market karşılaştırması, kategori bazlı arama yapabilirim!',
+        text: _welcomeMessage,
         isUser: false,
       ));
     }
@@ -284,6 +340,33 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
   Map<String, List<String>> _excludeFromGroupsDynamic = {};
   List<String> _stopWordsDynamic = [];
 
+  // Kampanya tipi eş anlamlıları — Firestore config/search.campaignTypeAliases
+  Map<String, List<String>> _campaignTypeAliasesDynamic = {
+    'buyOneGetOne': [
+      '1 alana 1 bedava', '1 al 1 bedava', '1alana1bedava', 'bir alana bir bedava',
+      '2 al 1 öde', '2 al 1 ode', 'bogo', 'bir al bir bedava',
+    ],
+  };
+
+  // Sorgu→ürün hariç tutma haritası — Firestore config/search.queryExcludeMap
+  // key: sorguda bulunmalı (ascii), value: üründe varsa hariç tut
+  Map<String, List<String>> _queryExcludeMapDynamic = {
+    'aycicek':   ['argan', 'nioli', 'hindistan', 'bakım', 'saç', 'cilt', 'vücut'],
+    'sivi yag':  ['argan', 'nioli', 'hindistan', 'bakım', 'saç', 'cilt', 'vücut'],
+    'misir yag': ['argan', 'nioli', 'hindistan', 'bakım', 'saç', 'cilt'],
+    'kanola':    ['argan', 'nioli', 'hindistan', 'bakım', 'saç', 'cilt'],
+    'riviera':   ['argan', 'nioli', 'hindistan', 'bakım', 'saç', 'cilt'],
+  };
+
+  // Sebze/meyve çapraz filtre listeleri — Firestore config/search.fruitList / .vegetableList
+  List<String> _fruitListDynamic = [
+    'karpuz','kavun','muz','kiraz','şeftali','erik','çilek','ananas','mango','üzüm',
+  ];
+  List<String> _vegetableListDynamic = [
+    'domates','salatalık','biber','patlıcan','kabak','ıspanak','marul',
+    'soğan','patates','havuç','brokoli','bezelye','pırasa','enginar',
+  ];
+
   // Türkçe → ASCII: her iki tarafı da ortak forma indirgeyerek karşılaştır
   // "cay" ve "çay" ikisi de "cay"a döner → eşleşir
   // "sut" ve "süt" ikisi de "sut"a döner → eşleşir
@@ -356,6 +439,19 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
   List<Map<String, dynamic>> _matchCampaignsLocally(String userQuery) {
     final query = userQuery.toLowerCase().trim();
     final queryAscii = _toAscii(query);
+
+    // Kampanya tipi sorgusu mu? (1 alana 1 bedava, 2 al 1 öde, vb.)
+    for (final entry in _campaignTypeAliasesDynamic.entries) {
+      final campaignType = entry.key;
+      final aliases = entry.value;
+      if (aliases.any((a) => queryAscii.contains(_toAscii(a)))) {
+        return _activeCampaigns
+            .where((c) => c['campaignType'] == campaignType)
+            .take(20)
+            .toList();
+      }
+    }
+
     // Stop word filtresi: "getir", "çeşitleri" gibi komut/dolgu kelimelerini çıkar
     final stopAscii = _stopWordsDynamic.map(_toAscii).toSet();
     final queryWords = query
@@ -412,7 +508,24 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       }
       if (excluded) continue;
 
-      // Skor hesapla — çok kelimeli synonym'ler için phraseMatch kullan
+      // Gıda yağı aranırken kozmetik/bakım yağlarını filtrele
+      for (final entry in _queryExcludeMapDynamic.entries) {
+        if (queryAscii.contains(entry.key)) {
+          if (entry.value.any((w) => product.contains(w))) {
+            excluded = true;
+            break;
+          }
+        }
+      }
+      if (excluded) continue;
+
+      // Orijinal sorgu kelimelerinin TÜMÜ üründe eşleşmeli
+      // (synonym genişletmesi ekstra skor kazandırır, ama asıl filtre orijinal kelimeler)
+      final allQueryWordsMatch = queryWords.every((qw) =>
+          _productContainsTerm(product, qw) || _productContainsTerm(market, qw));
+      if (!allQueryWordsMatch) continue;
+
+      // Skor hesapla — synonym eşleşmeleri skoru artırır
       int score = 0;
       for (final term in allTerms) {
         final isPhrase = term.contains(' ');
@@ -429,13 +542,6 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
     return scored.take(20).toList();
   }
 
-  // 1-2 kelime → direkt lokal
-  // 3+ kelime → Gemini'ye niyet tespiti sor ("arama" mı "sohbet" mi)
-  static const _marketNames = [
-    'a101', 'bim', 'bimde', 'migros', 'şok', 'sok', 'carrefour',
-    'metro', 'file', 'hakmar', 'diyos', 'onur', 'macro', 'kiler',
-  ];
-
   // 1-2 kelime → lokal (true)
   // 3+ kelime + market adı → Gemini (false)
   // 3+ kelime, market yok → niyet tespiti
@@ -446,7 +552,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
     if (words.length <= 2) return true; // kesin arama
 
     // Market adı varsa Gemini'ye git
-    if (_marketNames.any((m) => lower.contains(m))) return false;
+    if (_marketNamesDynamic.any((m) => lower.contains(m))) return false;
 
     if (_apiKey == null) return true;
     try {
@@ -514,9 +620,16 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       if (await _isSimpleQuery(q)) {
         final localMatches = _matchCampaignsLocally(q);
         final qCap = q[0].toUpperCase() + q.substring(1);
+        final _rnd = DateTime.now().millisecondsSinceEpoch;
         final localReply = localMatches.isNotEmpty
-            ? '$qCap için ${localMatches.length} kampanya buldum, aşağıda görebilirsin. Kartlardaki ❤️ ikonuna dokunarak favorilerinize ekleyin, indirimleri kaçırmayın!'
-            : 'Şu an "$q" için aktif kampanya bulamadım.';
+            ? (_foundMessageTemplates.isNotEmpty
+                ? _foundMessageTemplates[_rnd % _foundMessageTemplates.length]
+                    .replaceAll('{count}', '${localMatches.length}')
+                    .replaceAll('{query}', qCap)
+                : '$qCap için ${localMatches.length} kampanya buldum!')
+            : (_notFoundMessages.isNotEmpty
+                ? _notFoundMessages[_rnd % _notFoundMessages.length]
+                : 'Şu an bu ürün için aktif bir indirim kampanyası bulamadım.');
         setState(() => _persistedMessages.add(_ChatMessage(
           text: localReply,
           isUser: false,
@@ -607,33 +720,39 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
 
             // Sebze/meyve karışmasını önle: sorguya göre filtrele
             final qLower = q.toLowerCase();
-            // Sebze aranınca filtrelenecek belirgin meyveler (limon/narenciye hariç)
-            const sadeceMeyve = ['karpuz','kavun','muz','kiraz','şeftali','erik','çilek','ananas','mango','üzüm'];
-            // Meyve aranınca filtrelenecek belirgin sebzeler
-            const sadeceSebze = ['domates','salatalık','biber','patlıcan','kabak','ıspanak','marul','soğan','patates','havuç','brokoli','bezelye','pırasa','enginar'];
-            final sorguSebze = qLower.contains('sebze') || sadeceSebze.any((s) => qLower.contains(s));
-            final sorguMeyve = qLower.contains('meyve') || sadeceMeyve.any((s) => qLower.contains(s));
+            final sorguSebze = qLower.contains('sebze') || _vegetableListDynamic.any((s) => qLower.contains(s));
+            final sorguMeyve = qLower.contains('meyve') || _fruitListDynamic.any((s) => qLower.contains(s));
             if (sorguSebze && !sorguMeyve) {
               matched = matched.where((c) {
                 final p = (c['product'] as String? ?? '').toLowerCase();
-                return !sadeceMeyve.any((m) => p.contains(m));
+                return !_fruitListDynamic.any((m) => p.contains(m));
               }).toList();
-              // Metinden de meyve isimlerini içeren cümleleri çıkar
-              for (final meyve in sadeceMeyve) {
+              for (final meyve in _fruitListDynamic) {
                 reply = reply.replaceAll(
                   RegExp('[^.!?]*$meyve[^.!?]*[.!?]', caseSensitive: false), '');
               }
             } else if (sorguMeyve && !sorguSebze) {
               matched = matched.where((c) {
                 final p = (c['product'] as String? ?? '').toLowerCase();
-                return !sadeceSebze.any((s) => p.contains(s));
+                return !_vegetableListDynamic.any((s) => p.contains(s));
               }).toList();
-              // Metinden de sebze isimlerini içeren cümleleri çıkar
-              for (final sebze in sadeceSebze) {
+              for (final sebze in _vegetableListDynamic) {
                 reply = reply.replaceAll(
                   RegExp('[^.!?]*$sebze[^.!?]*[.!?]', caseSensitive: false), '');
               }
             }
+            // Gıda yağı aranırken kozmetik/bakım yağlarını filtrele
+            final qAscii = _toAscii(qLower);
+            for (final entry in _queryExcludeMapDynamic.entries) {
+              if (qAscii.contains(entry.key)) {
+                matched = matched.where((c) {
+                  final p = (c['product'] as String? ?? '').toLowerCase();
+                  return !entry.value.any((w) => p.contains(w));
+                }).toList();
+                break;
+              }
+            }
+
             reply = reply.replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
           } catch (_) {}
         }
@@ -768,7 +887,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
                 setState(() {
                   _persistedMessages.clear();
                   _persistedMessages.add(_ChatMessage(
-                    text: 'Merhaba! 👋 Ben İndirim ve Fırsat Asistanıyım.\n\nMevcut kampanyalar hakkında her şeyi sorabilirsin. Bütçene göre öneri, market karşılaştırması, kategori bazlı arama yapabilirim!',
+                    text: _welcomeMessage,
                     isUser: false,
                   ));
                 });
