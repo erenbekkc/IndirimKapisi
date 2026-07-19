@@ -616,8 +616,13 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
 
       await _loadAllCampaigns();
 
+      // Kampanya tipi sorgusu ise (1 al 1 bedava, 2 al 1 öde vb.) direkt local'e git
+      final qAsciiForType = _toAscii(q.toLowerCase());
+      final isCampaignTypeQuery = _campaignTypeAliasesDynamic.values
+          .any((aliases) => aliases.any((a) => qAsciiForType.contains(_toAscii(a))));
+
       // Basit sorgularda Gemini'ye gitme — yerel filtrele
-      if (await _isSimpleQuery(q)) {
+      if (isCampaignTypeQuery || await _isSimpleQuery(q)) {
         final localMatches = _matchCampaignsLocally(q);
         final qCap = q[0].toUpperCase() + q.substring(1);
         final _rnd = DateTime.now().millisecondsSinceEpoch;
