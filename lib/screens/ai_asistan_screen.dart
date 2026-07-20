@@ -441,15 +441,41 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
     final queryAscii = _toAscii(query);
 
     // Kampanya tipi sorgusu mu? (1 alana 1 bedava, 2 al 1 öde, vb.)
+    final queryAsciiNoSpace = queryAscii.replaceAll(' ', '');
     for (final entry in _campaignTypeAliasesDynamic.entries) {
       final campaignType = entry.key;
       final aliases = entry.value;
-      if (aliases.any((a) => queryAscii.contains(_toAscii(a)))) {
-        return _activeCampaigns
-            .where((c) => c['campaignType'] == campaignType)
-            .take(20)
-            .toList();
+      final matched = aliases.any((a) {
+        final aAscii = _toAscii(a);
+        return queryAscii.contains(aAscii) ||
+               queryAsciiNoSpace.contains(aAscii.replaceAll(' ', ''));
+      });
+      if (!matched) continue;
+
+      // Alias dışındaki kelimeleri çıkar (market adı, ürün adı) ve filtre olarak kullan
+      String remaining = query;
+      for (final a in aliases) {
+        remaining = remaining.replaceAll(RegExp(a, caseSensitive: false), '');
       }
+      final filterWords = remaining
+          .split(RegExp(r'\s+'))
+          .where((w) => w.length >= 2)
+          .toList();
+
+      var results = _activeCampaigns
+          .where((c) => c['campaignType'] == campaignType)
+          .toList();
+
+      if (filterWords.isNotEmpty) {
+        results = results.where((c) {
+          final product = (c['product'] as String? ?? '').toLowerCase();
+          final market  = (c['marketName'] as String? ?? '').toLowerCase();
+          return filterWords.every((w) =>
+              _productContainsTerm(product, w) || _productContainsTerm(market, w));
+        }).toList();
+      }
+
+      return results.take(20).toList();
     }
 
     // Stop word filtresi: "getir", "çeşitleri" gibi komut/dolgu kelimelerini çıkar
@@ -617,9 +643,15 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       await _loadAllCampaigns();
 
       // Kampanya tipi sorgusu ise (1 al 1 bedava, 2 al 1 öde vb.) direkt local'e git
+      // Boşlukları normalize ederek karşılaştır: "1alana1bedava" == "1 alana 1 bedava"
       final qAsciiForType = _toAscii(q.toLowerCase());
-      final isCampaignTypeQuery = _campaignTypeAliasesDynamic.values
-          .any((aliases) => aliases.any((a) => qAsciiForType.contains(_toAscii(a))));
+      final qAsciiNoSpace = qAsciiForType.replaceAll(' ', '');
+      final isCampaignTypeQuery = _campaignTypeAliasesDynamic.values.any((aliases) =>
+          aliases.any((a) {
+            final aAscii = _toAscii(a);
+            return qAsciiForType.contains(aAscii) ||
+                   qAsciiNoSpace.contains(aAscii.replaceAll(' ', ''));
+          }));
 
       // Basit sorgularda Gemini'ye gitme — yerel filtrele
       if (isCampaignTypeQuery || await _isSimpleQuery(q)) {

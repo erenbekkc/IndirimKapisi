@@ -3,6 +3,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../ad_helper.dart';
 import '../session_tracker.dart';
+import '../services/ad_config_service.dart';
 
 class NativeAdWidget extends StatefulWidget {
   const NativeAdWidget({super.key});
@@ -49,6 +50,7 @@ class _NativeAdWidgetState extends State<NativeAdWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (!AdConfigService.instance.config.showNative) return const SizedBox.shrink();
     if (!_isLoaded || _nativeAd == null) return const SizedBox.shrink();
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 120, maxHeight: 180),

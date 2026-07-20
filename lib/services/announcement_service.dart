@@ -4,23 +4,49 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../screens/settings_screen.dart' show getOrCreateUserId;
 
+class AnnouncementButton {
+  final String text;
+  final String action;   // 'url' | 'dismiss'
+  final String? urlAndroid;
+  final String? urlIos;
+  final bool markSeen;
+
+  const AnnouncementButton({
+    required this.text,
+    required this.action,
+    this.urlAndroid,
+    this.urlIos,
+    required this.markSeen,
+  });
+
+  String? get resolvedUrl => Platform.isIOS ? urlIos : urlAndroid;
+
+  factory AnnouncementButton.fromMap(Map<String, dynamic> m) {
+    return AnnouncementButton(
+      text: m['text'] as String? ?? '',
+      action: m['action'] as String? ?? 'dismiss',
+      urlAndroid: m['urlAndroid'] as String?,
+      urlIos: m['urlIos'] as String?,
+      markSeen: m['markSeen'] as bool? ?? true,
+    );
+  }
+}
+
 class AnnouncementData {
   final String id;
   final String title;
   final String message;
   final String type; // info | update | promo
-  final String ctaText;
-  final String? ctaUrl;
   final bool showOnce;
+  final List<AnnouncementButton> buttons;
 
   const AnnouncementData({
     required this.id,
     required this.title,
     required this.message,
     required this.type,
-    required this.ctaText,
-    this.ctaUrl,
     required this.showOnce,
+    required this.buttons,
   });
 }
 
@@ -48,7 +74,7 @@ class AnnouncementService {
       if (startDate != null && now.isBefore(startDate)) return null;
       if (endDate != null && now.isAfter(endDate)) return null;
 
-      // targetMaxBuild kontrolü (opsiyonel): sadece belirli build ve altına göster
+      // targetMaxBuild kontrolü
       final targetMaxBuild = data['targetMaxBuild'] as int?;
       if (targetMaxBuild != null) {
         final info = await PackageInfo.fromPlatform();
@@ -63,14 +89,21 @@ class AnnouncementService {
         if (prefs.getBool('seen_ann_$id') == true) return null;
       }
 
+      // Butonları parse et — yoksa tek "Tamam" butonu
+      final rawButtons = data['buttons'] as List<dynamic>?;
+      final buttons = rawButtons != null && rawButtons.isNotEmpty
+          ? rawButtons
+              .map((b) => AnnouncementButton.fromMap(b as Map<String, dynamic>))
+              .toList()
+          : [const AnnouncementButton(text: 'Tamam', action: 'dismiss', markSeen: true)];
+
       return AnnouncementData(
         id: id,
         title: data['title'] as String? ?? '',
         message: data['message'] as String? ?? '',
         type: data['type'] as String? ?? 'info',
-        ctaText: data['ctaText'] as String? ?? 'Tamam',
-        ctaUrl: data['ctaUrl'] as String?,
         showOnce: showOnce,
+        buttons: buttons,
       );
     } catch (_) {
       return null;
@@ -82,7 +115,6 @@ class AnnouncementService {
     await prefs.setBool('seen_ann_$id', true);
   }
 
-  /// event: 'shown' | 'cta_tapped' | 'dismissed'
   static Future<void> logEvent(AnnouncementData ann, String event) async {
     try {
       final uid = await getOrCreateUserId();
@@ -91,7 +123,6 @@ class AnnouncementService {
         'title': ann.title,
         'type': ann.type,
         'event': event,
-        'hasUrl': ann.ctaUrl != null,
         'uid': uid,
         'platform': Platform.isIOS ? 'ios' : 'android',
         'at': FieldValue.serverTimestamp(),

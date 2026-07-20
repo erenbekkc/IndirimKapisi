@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../ad_helper.dart';
 import '../session_tracker.dart';
+import '../services/ad_config_service.dart';
 
 class BannerAdWidget extends StatefulWidget {
   const BannerAdWidget({super.key});
@@ -45,6 +46,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
 
   @override
   Widget build(BuildContext context) {
+    if (!AdConfigService.instance.config.showBanner) return const SizedBox.shrink();
     if (!_isLoaded || _bannerAd == null) return const SizedBox.shrink();
     return SizedBox(
       width: _bannerAd!.size.width.toDouble(),

@@ -9,6 +9,8 @@ import 'ai_asistan_screen.dart';
 import '../session_tracker.dart';
 import '../services/announcement_service.dart';
 import '../widgets/announcement_dialog.dart';
+import '../services/ad_config_service.dart';
+import '../services/interstitial_ad_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -25,25 +27,30 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkAnnouncement());
+    _initAds();
+  }
+
+  Future<void> _initAds() async {
+    await AdConfigService.instance.load();
+    InterstitialAdService.instance.startSession();
+    InterstitialAdService.instance.load();
   }
 
   Future<void> _checkAnnouncement() async {
     final ann = await AnnouncementService.fetchIfShouldShow();
     if (ann == null || !mounted) return;
     AnnouncementService.logEvent(ann, 'shown');
-    await showDialog<void>(
+    final tappedBtn = await showDialog<AnnouncementButton>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => AnnouncementDialog(
-        data: ann,
-        onCtaTap: () async {
-          AnnouncementService.logEvent(ann, 'cta_tapped');
-          if (ann.showOnce) await AnnouncementService.markAsSeen(ann.id);
-          // ignore: use_build_context_synchronously
-          Navigator.of(context).pop();
-        },
-      ),
+      builder: (_) => AnnouncementDialog(data: ann),
     );
+    if (tappedBtn == null) return;
+    final event = tappedBtn.action == 'url' ? 'cta_tapped' : 'dismissed';
+    AnnouncementService.logEvent(ann, event);
+    if (tappedBtn.markSeen) {
+      await AnnouncementService.markAsSeen(ann.id);
+    }
   }
 
   @override
@@ -58,6 +65,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       SessionTracker.instance.saveAndReset();
     } else if (state == AppLifecycleState.resumed) {
       SessionTracker.instance.startSession();
+      InterstitialAdService.instance.tryShow(context, 'onAppResume');
     }
   }
 
@@ -94,7 +102,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
-        onDestinationSelected: (i) => setState(() => _currentIndex = i),
+        onDestinationSelected: (i) {
+          setState(() => _currentIndex = i);
+          InterstitialAdService.instance.tryShow(context, 'onTabSwitch');
+        },
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         animationDuration:
             Platform.isIOS ? Duration.zero : const Duration(milliseconds: 500),

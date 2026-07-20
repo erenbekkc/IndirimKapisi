@@ -24,7 +24,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String? _selectedMarketId;
   String? _selectedCategoryId;
-  String _sortMode = 'ending'; // 'ending' | 'popular' | 'newest'
+  String _sortMode = 'popular'; // 'ending' | 'popular' | 'newest'
 
   final TextEditingController _searchController = TextEditingController();
 
@@ -136,6 +136,9 @@ class _HomeScreenState extends State<HomeScreen> {
       docs.sort((a, b) {
         final da = a.data() as Map<String, dynamic>;
         final db = b.data() as Map<String, dynamic>;
+        final pa = _sortPriority(da);
+        final pb = _sortPriority(db);
+        if (pa != pb) return pa.compareTo(pb);
         return _discountPct(db).compareTo(_discountPct(da));
       });
     } else if (_sortMode == 'newest') {
@@ -152,9 +155,17 @@ class _HomeScreenState extends State<HomeScreen> {
     return docs;
   }
 
+  // Sıralama önceliği: 1=buyOneGetOne, 2=secondDiscount, 3=priceDiscount
+  int _sortPriority(Map<String, dynamic> data) {
+    final type = data['campaignType'] as String? ?? '';
+    if (type == 'buyOneGetOne') return 1;
+    if (type == 'secondDiscount') return 2;
+    return 3;
+  }
+
   int _discountPct(Map<String, dynamic> data) {
     final type = data['campaignType'] as String? ?? '';
-    if (type == 'buyOneGetOne') return 50;
+    if (type == 'buyOneGetOne') return 100;
     if (type == 'secondDiscount') return (data['discountRate'] as num?)?.toInt() ?? 0;
     final old = (data['oldPrice'] as num?)?.toDouble() ?? 0;
     final neu = (data['newPrice'] as num?)?.toDouble() ?? 0;
@@ -538,7 +549,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const Text('Sıralama', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 ...['ending', 'popular', 'newest'].map((mode) {
-                  final modeLabels = {'ending': 'Bitiş Tarihi', 'popular': 'Popüler', 'newest': 'En Yeni'};
+                  final modeLabels = {'ending': 'Bitiş Tarihi', 'popular': 'En Avantajlı', 'newest': 'En Yeni'};
                   final selected = _sortMode == mode;
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -569,7 +580,7 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              {'ending': 'Bitiş', 'popular': 'Popüler', 'newest': 'En Yeni'}[_sortMode]!,
+              {'ending': 'Bitiş', 'popular': 'En Avantajlı', 'newest': 'En Yeni'}[_sortMode]!,
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.black87),
             ),
             const SizedBox(width: 4),

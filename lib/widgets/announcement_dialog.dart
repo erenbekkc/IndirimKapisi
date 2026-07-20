@@ -1,15 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/announcement_service.dart';
 
 class AnnouncementDialog extends StatelessWidget {
   final AnnouncementData data;
-  final VoidCallback onCtaTap;
 
-  const AnnouncementDialog({
-    super.key,
-    required this.data,
-    required this.onCtaTap,
-  });
+  const AnnouncementDialog({super.key, required this.data});
 
   static const _typeConfig = {
     'update': (
@@ -43,10 +39,7 @@ class AnnouncementDialog extends StatelessWidget {
             Container(
               width: 64,
               height: 64,
-              decoration: BoxDecoration(
-                color: cfg.bg,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: cfg.bg, shape: BoxShape.circle),
               child: Icon(cfg.icon, color: cfg.color, size: 32),
             ),
             const SizedBox(height: 16),
@@ -70,29 +63,67 @@ class AnnouncementDialog extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: onCtaTap,
-                style: FilledButton.styleFrom(
-                  backgroundColor: cfg.color,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+            ...data.buttons.asMap().entries.map((entry) {
+              final i = entry.key;
+              final btn = entry.value;
+              final isFirst = i == 0;
+              final isLast = i == data.buttons.length - 1;
+
+              return Padding(
+                padding: EdgeInsets.only(bottom: isLast ? 0 : 8),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: isFirst
+                      ? FilledButton(
+                          onPressed: () => _handleTap(context, btn),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: cfg.color,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: Text(btn.text,
+                              style: const TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.w600)),
+                        )
+                      : i == 1
+                          ? OutlinedButton(
+                              onPressed: () => _handleTap(context, btn),
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 13),
+                                side: BorderSide(color: Colors.grey.shade300),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                              ),
+                              child: Text(btn.text,
+                                  style: const TextStyle(
+                                      fontSize: 14, color: Colors.black87)),
+                            )
+                          : TextButton(
+                              onPressed: () => _handleTap(context, btn),
+                              child: Text(btn.text,
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey.shade500)),
+                            ),
                 ),
-                child: Text(
-                  data.ctaText,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
+              );
+            }),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _handleTap(BuildContext context, AnnouncementButton btn) async {
+    if (btn.action == 'url') {
+      final url = btn.resolvedUrl;
+      if (url != null && url.isNotEmpty) {
+        final uri = Uri.tryParse(url);
+        if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    }
+    if (context.mounted) Navigator.of(context).pop(btn);
   }
 }
