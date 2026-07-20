@@ -546,9 +546,23 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       if (excluded) continue;
 
       // Orijinal sorgu kelimelerinin TÜMÜ üründe eşleşmeli
-      // (synonym genişletmesi ekstra skor kazandırır, ama asıl filtre orijinal kelimeler)
-      final allQueryWordsMatch = queryWords.every((qw) =>
-          _productContainsTerm(product, qw) || _productContainsTerm(market, qw));
+      // Eğer kelime bir sinonim grubundaysa, grubun herhangi bir üyesi eşleşmesi yeterli
+      final allQueryWordsMatch = queryWords.every((qw) {
+        if (_productContainsTerm(product, qw) || _productContainsTerm(market, qw)) return true;
+        final wordAscii = _toAscii(qw);
+        final wordRoot = _stripSuffix(qw);
+        for (final group in _synonymGroupsDynamic) {
+          if (group.any((g) => _toAscii(g) == wordAscii || _toAscii(g) == wordRoot)) {
+            return group.any((syn) {
+              final isPhrase = syn.contains(' ');
+              return isPhrase
+                  ? _phraseMatchesProduct(product, syn) || _phraseMatchesProduct(market, syn)
+                  : _productContainsTerm(product, syn) || _productContainsTerm(market, syn);
+            });
+          }
+        }
+        return false;
+      });
       if (!allQueryWordsMatch) continue;
 
       // Skor hesapla — synonym eşleşmeleri skoru artırır
