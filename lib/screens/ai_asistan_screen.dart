@@ -104,6 +104,10 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         if (markets != null && markets.isNotEmpty) {
           _marketNamesDynamic = List<String>.from(markets);
         }
+        final social = cb['socialPhrases'] as List<dynamic>?;
+        if (social != null && social.isNotEmpty) {
+          _socialPhrasesDynamic = List<String>.from(social);
+        }
       }
     } catch (e, s) {
       logError('ai_loadChatbotConfig', e, s);
@@ -583,11 +587,27 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
   }
 
   // 1-2 kelime → lokal (true)
+  // Sohbet/selamlama kelimeleri — Firestore config/chatbot.socialPhrases'tan yüklenir
+  List<String> _socialPhrasesDynamic = [
+    'teşekkür', 'tesekkur', 'teşekkürler', 'sağ ol', 'sagol', 'eyvallah',
+    'merhaba', 'selam', 'iyi günler', 'günaydın', 'iyi akşamlar',
+    'nasılsın', 'nasil', 'naber', 'hey', 'hi',
+    'harika', 'süper', 'bravo', 'aferin', 'tamam', 'anladım', 'tamamdır',
+    'görüşürüz', 'hoşçakal', 'bay bay',
+  ];
+
   // 3+ kelime + market adı → Gemini (false)
   // 3+ kelime, market yok → niyet tespiti
   Future<bool> _isSimpleQuery(String q) async {
-    final lower = q.toLowerCase();
-    final words = lower.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    final lower = q.toLowerCase().trim();
+    final lowerAscii = _toAscii(lower);
+
+    // Sosyal/selamlama ifadesi ise Gemini'ye git
+    if (_socialPhrasesDynamic.any((p) => lowerAscii == _toAscii(p) || lowerAscii.startsWith(_toAscii(p)))) {
+      return false;
+    }
+
+    final words = lower.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
 
     if (words.length <= 2) return true; // kesin arama
 
