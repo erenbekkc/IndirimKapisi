@@ -108,6 +108,10 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         if (social != null && social.isNotEmpty) {
           _socialPhrasesDynamic = List<String>.from(social);
         }
+        final intentP = cb['intentPrompt'] as String?;
+        if (intentP != null && intentP.isNotEmpty) {
+          _intentPrompt = intentP;
+        }
       }
     } catch (e, s) {
       logError('ai_loadChatbotConfig', e, s);
@@ -154,6 +158,10 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
         final vegs = data['vegetableList'] as List<dynamic>?;
         if (vegs != null && vegs.isNotEmpty) {
           _vegetableListDynamic = List<String>.from(vegs);
+        }
+        final discWords = data['discountWords'] as List<dynamic>?;
+        if (discWords != null && discWords.isNotEmpty) {
+          _discountWordsDynamic = List<String>.from(discWords);
         }
       }
     } catch (e, s) {
@@ -371,6 +379,12 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
     'soğan','patates','havuç','brokoli','bezelye','pırasa','enginar',
   ];
 
+  // İndirim oranı sorgusunda sayıdan önce/sonra temizlenecek kelimeler
+  // Firestore config/search.discountWords
+  List<String> _discountWordsDynamic = [
+    'indirimli', 'indirim', 'yüzde', 'iskonto', 'ucuz', 'kampanya', 'kampanyalar', 'fırsatlı',
+  ];
+
   // Türkçe → ASCII: her iki tarafı da ortak forma indirgeyerek karşılaştır
   // "cay" ve "çay" ikisi de "cay"a döner → eşleşir
   // "sut" ve "süt" ikisi de "sut"a döner → eşleşir
@@ -440,9 +454,23 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
     return words.every((w) => _productContainsTerm(product, w));
   }
 
+  // Kampanya tipine göre indirim oranını hesapla/oku
+  int _campaignDiscountRate(Map<String, dynamic> c) {
+    final type = c['campaignType'] as String? ?? '';
+    if (type == 'priceDiscount') {
+      final oldP = (c['oldPrice'] as num?)?.toDouble() ?? 0;
+      final newP = (c['newPrice'] as num?)?.toDouble() ?? 0;
+      return oldP > 0 ? ((oldP - newP) / oldP * 100).round() : 0;
+    }
+    return (c['discountRate'] as num?)?.toInt() ?? 0;
+  }
+
   List<Map<String, dynamic>> _matchCampaignsLocally(String userQuery) {
     final query = userQuery.toLowerCase().trim();
     final queryAscii = _toAscii(query);
+
+    // Stop word seti — Firestore config/search.stopWords'ten yüklenir
+    final stopAscii = _stopWordsDynamic.map(_toAscii).toSet();
 
     // Kampanya tipi sorgusu mu? (1 alana 1 bedava, 2 al 1 öde, vb.)
     final queryAsciiNoSpace = queryAscii.replaceAll(' ', '');
@@ -461,9 +489,16 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       for (final a in aliases) {
         remaining = remaining.replaceAll(RegExp(a, caseSensitive: false), '');
       }
+      // Stop word + saf ek kalıntılarını ("ları", "leri" vb.) filtrele
       final filterWords = remaining
           .split(RegExp(r'\s+'))
-          .where((w) => w.length >= 2)
+          .where((w) {
+            if (w.length < 2) return false;
+            final wAscii = _toAscii(w);
+            if (stopAscii.contains(wAscii)) return false;         // stop word (Firestore)
+            if (_validSuffixesAscii.contains(wAscii)) return false; // ek kalıntısı
+            return true;
+          })
           .toList();
 
       var results = _activeCampaigns
@@ -482,8 +517,47 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
       return results.take(20).toList();
     }
 
+    // İndirim oranı sorgusu? "%50", "yüzde 50", "%50 indirimli" vb.
+    // Firestore config/search.discountWords ile temizlenecek kelimeler yönetilir
+    final discountRegex = RegExp(r'%\s*(\d+)|yuzde\s+(\d+)');
+    final discountMatch = discountRegex.firstMatch(queryAscii);
+    if (discountMatch != null) {
+      final rateStr = discountMatch.group(1) ?? discountMatch.group(2);
+      final rate = int.tryParse(rateStr ?? '') ?? 0;
+      if (rate > 0) {
+        // Oran ifadesini + indirim kelimelerini temizle, kalan ürün filtresi
+        String cleanedQuery = query
+            .replaceAll(RegExp(r'%\s*\d+'), '')
+            .replaceAll(RegExp(r'yüzde\s+\d+', caseSensitive: false), '');
+        for (final dw in _discountWordsDynamic) {
+          cleanedQuery = cleanedQuery.replaceAll(
+              RegExp('\\b${RegExp.escape(dw)}\\b', caseSensitive: false), '');
+        }
+        cleanedQuery = cleanedQuery.trim();
+
+        var results = _activeCampaigns
+            .where((c) => _campaignDiscountRate(c) >= rate)
+            .toList();
+
+        if (cleanedQuery.isNotEmpty) {
+          final cleanWords = cleanedQuery
+              .split(RegExp(r'\s+'))
+              .where((w) => w.length >= 2 && !stopAscii.contains(_toAscii(w)))
+              .toList();
+          if (cleanWords.isNotEmpty) {
+            results = results.where((c) {
+              final product = (c['product'] as String? ?? '').toLowerCase();
+              final market  = (c['marketName'] as String? ?? '').toLowerCase();
+              return cleanWords.every((w) =>
+                  _productContainsTerm(product, w) || _productContainsTerm(market, w));
+            }).toList();
+          }
+        }
+        return results.take(20).toList();
+      }
+    }
+
     // Stop word filtresi: "getir", "çeşitleri" gibi komut/dolgu kelimelerini çıkar
-    final stopAscii = _stopWordsDynamic.map(_toAscii).toSet();
     final queryWords = query
         .split(RegExp(r'\s+'))
         .where((w) => w.length >= 2 && !stopAscii.contains(_toAscii(w)))
@@ -587,6 +661,16 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
   }
 
   // 1-2 kelime → lokal (true)
+  // Intent detection mini-promptu — Firestore config/chatbot.intentPrompt'tan yüklenir
+  String _intentPrompt =
+      'Kullanıcı bir alışveriş asistanına şunu yazdı: "{QUERY}"\n\n'
+      'Bu mesaj:\n'
+      '- Sadece ürün veya kategori adı içeriyorsa "arama" yaz\n'
+      '- Planlama, bağlam veya niyet içeriyorsa "sohbet" yaz '
+      '(örnek: yapacağım, ikram edeceğim, neler lazım, öneri ver, karşılaştır)\n'
+      '- Genel soru veya sohbet ise "sohbet" yaz\n\n'
+      'Sadece tek kelime yaz: arama veya sohbet';
+
   // Sohbet/selamlama kelimeleri — Firestore config/chatbot.socialPhrases'tan yüklenir
   List<String> _socialPhrasesDynamic = [
     'teşekkür', 'tesekkur', 'teşekkürler', 'sağ ol', 'sagol', 'eyvallah',
@@ -626,11 +710,7 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
             {
               'parts': [
                 {
-                  'text': 'Kullanıcı bir alışveriş asistanına şunu yazdı: "$q"\n\n'
-                      'Bu mesaj:\n'
-                      '- Bir ürün veya kategori araması ise "arama" yaz\n'
-                      '- Fiyat sorusu, öneri, karşılaştırma, bütçe veya sohbet ise "sohbet" yaz\n\n'
-                      'Sadece tek kelime yaz: arama veya sohbet',
+                  'text': _intentPrompt.replaceAll('{QUERY}', q),
                 }
               ]
             }
@@ -687,8 +767,12 @@ class _AiAsistanScreenState extends State<AiAsistanScreen> {
                    qAsciiNoSpace.contains(aAscii.replaceAll(' ', ''));
           }));
 
+      // İndirim oranı sorgusu da doğrudan lokal filtrele (%50, yüzde 50)
+      final isDiscountQuery =
+          RegExp(r'%\s*\d+|yüzde\s+\d+', caseSensitive: false).hasMatch(q);
+
       // Basit sorgularda Gemini'ye gitme — yerel filtrele
-      if (isCampaignTypeQuery || await _isSimpleQuery(q)) {
+      if (isCampaignTypeQuery || isDiscountQuery || await _isSimpleQuery(q)) {
         final localMatches = _matchCampaignsLocally(q);
         final qCap = q[0].toUpperCase() + q.substring(1);
         final _rnd = DateTime.now().millisecondsSinceEpoch;

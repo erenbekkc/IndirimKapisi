@@ -11,6 +11,7 @@ import '../services/announcement_service.dart';
 import '../widgets/announcement_dialog.dart';
 import '../services/ad_config_service.dart';
 import '../services/interstitial_ad_service.dart';
+import '../services/native_ad_pool.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -32,6 +33,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   Future<void> _initAds() async {
     await AdConfigService.instance.load();
+    // Native reklam havuzunu preload et — widget oluşunca hazır beklesin
+    if (AdConfigService.instance.config.showNative) {
+      NativeAdPool.instance.initialize();
+    }
     InterstitialAdService.instance.startSession();
     InterstitialAdService.instance.load();
   }
