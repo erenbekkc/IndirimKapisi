@@ -22,6 +22,7 @@ import 'screens/settings_screen.dart' show saveUserPrefsToFirestore, getOrCreate
 import 'app_logger.dart';
 import 'notification_logger.dart';
 import 'remote_config_service.dart';
+import 'services/native_ad_pool.dart';
 import 'session_tracker.dart';
 
 final FlutterLocalNotificationsPlugin localNotifications = FlutterLocalNotificationsPlugin();
@@ -318,6 +319,13 @@ void main() {
         await MobileAds.instance.initialize();
       } catch (e, s) {
         FirebaseCrashlytics.instance.recordError(e, s, reason: 'MobileAds init');
+      }
+      // MobileAds hazır olduktan hemen sonra pool'u preload et
+      // (MainScreen._initAds() erken çağrılırsa AdMob henüz hazır olmayabilir)
+      try {
+        NativeAdPool.instance.initialize();
+      } catch (e) {
+        FirebaseCrashlytics.instance.log('NativeAdPool init failed: $e');
       }
     });
 

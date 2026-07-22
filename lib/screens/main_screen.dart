@@ -33,10 +33,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   Future<void> _initAds() async {
     await AdConfigService.instance.load();
-    // Native reklam havuzunu preload et — widget oluşunca hazır beklesin
-    if (AdConfigService.instance.config.showNative) {
-      NativeAdPool.instance.initialize();
-    }
     InterstitialAdService.instance.startSession();
     InterstitialAdService.instance.load();
   }
